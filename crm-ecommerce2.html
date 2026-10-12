@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dark Store CRM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f14;--bg2:#13161e;--bg3:#1a1e28;--bg4:#212535;
+  --border:#2a2f3f;--border2:#343a52;
+  --accent:#4f6ef7;--accent2:#6d84ff;--accent-glow:rgba(79,110,247,0.15);
+  --green:#22c55e;--green-bg:rgba(34,197,94,0.1);
+  --red:#ef4444;--red-bg:rgba(239,68,68,0.1);
+  --yellow:#f59e0b;--yellow-bg:rgba(245,158,11,0.1);
+  --blue:#3b82f6;--blue-bg:rgba(59,130,246,0.1);
+  --purple:#a855f7;--purple-bg:rgba(168,85,247,0.1);
+  --orange:#f97316;--orange-bg:rgba(249,115,22,0.1);
+  --text:#e8ecf5;--text2:#9aa3bc;--text3:#5c647d;
+  --sidebar-w:240px;--radius:10px;--radius-lg:14px;
+  --shadow:0 4px 24px rgba(0,0,0,0.4);
+}
+html{font-size:14px}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl;overflow-x:hidden}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px}
+.app-layout{display:flex;min-height:100vh}
+.sidebar{width:var(--sidebar-w);background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;right:0;bottom:0;z-index:100;overflow-y:auto}
+.sidebar-logo{padding:20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;box-shadow:0 0 16px var(--accent-glow)}
+.logo-text{font-size:13px;font-weight:700;color:var(--text);line-height:1.3}
+.logo-sub{font-size:10px;color:var(--text3)}
+.sidebar-section{padding:8px 10px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:all .15s;color:var(--text2);font-size:13px;font-weight:500;margin-bottom:1px}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--accent-glow);color:var(--accent2)}
+.nav-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.nav-badge{margin-right:auto;background:var(--accent);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px}
+.sidebar-user{margin-top:auto;padding:12px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.user-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.user-name{font-size:12px;font-weight:600;color:var(--text)}
+.user-role{font-size:10px;color:var(--text3)}
+.main-content{margin-right:var(--sidebar-w);flex:1;min-height:100vh;display:flex;flex-direction:column}
+.topbar{height:56px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;position:sticky;top:0;z-index:90}
+.topbar-title{font-size:16px;font-weight:700;color:var(--text);flex:1}
+.page{padding:24px;flex:1}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.page-title{font-size:18px;font-weight:800;color:var(--text)}
+.page-sub{font-size:12px;color:var(--text3);margin-top:2px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;transition:all .2s;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.blue::before{background:var(--blue)}.stat-card.green::before{background:var(--green)}
+.stat-card.red::before{background:var(--red)}.stat-card.yellow::before{background:var(--yellow)}
+.stat-card.purple::before{background:var(--purple)}.stat-card.orange::before{background:var(--orange)}
+.stat-label{font-size:11px;color:var(--text3);font-weight:500;margin-bottom:6px}
+.stat-value{font-size:26px;font-weight:800;color:var(--text);line-height:1}
+.stat-icon{font-size:22px;margin-bottom:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;border:none;outline:none;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}.btn-ghost:hover{background:var(--bg4);color:var(--text)}
+.btn-danger{background:var(--red-bg);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.btn-success{background:var(--green-bg);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.btn-warning{background:var(--yellow-bg);color:var(--yellow);border:1px solid rgba(245,158,11,.2)}
+.btn-sm{padding:5px 10px;font-size:11px}.btn-xs{padding:3px 8px;font-size:10px;border-radius:6px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.table-toolbar{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse}
+thead th{padding:10px 14px;text-align:right;font-size:10px;font-weight:700;color:var(--text3);background:var(--bg3);border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--bg3)}
+tbody tr.selected{background:var(--accent-glow)}
+td{padding:10px 14px;font-size:12px;color:var(--text2);vertical-align:middle}
+td.bold{color:var(--text);font-weight:600}
+.td-check{width:36px;padding:10px 8px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
+.badge-dot{width:5px;height:5px;border-radius:50%}
+.badge-new,.badge-pending{background:var(--blue-bg);color:var(--blue)}
+.badge-assigned{background:var(--purple-bg);color:var(--purple)}
+.badge-confirmed{background:var(--green-bg);color:var(--green)}
+.badge-cancelled{background:var(--red-bg);color:var(--red)}
+.badge-follow_up{background:var(--yellow-bg);color:var(--yellow)}
+.badge-shipped{background:var(--orange-bg);color:var(--orange)}
+.badge-delivered{background:var(--green-bg);color:var(--green)}
+.badge-not_delivered{background:var(--red-bg);color:var(--red)}
+.badge-paid{background:var(--green-bg);color:var(--green)}
+.badge-unpaid{background:var(--yellow-bg);color:var(--yellow)}
+.input{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;outline:none;transition:border-color .15s;width:100%}
+.input:focus{border-color:var(--accent)}
+.input::placeholder{color:var(--text3)}
+.select{appearance:none;cursor:pointer}
+.search-input{width:220px}
+.form-group{margin-bottom:14px}
+.form-label{font-size:11px;font-weight:700;color:var(--text3);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.5px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);width:100%;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow);animation:slideUp .2s ease}
+.modal-sm{max-width:420px}.modal-md{max-width:620px}.modal-lg{max-width:860px}
+.modal-header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg2);z-index:10}
+.modal-title{font-size:15px;font-weight:700;color:var(--text)}
+.modal-body{padding:20px}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:var(--bg2)}
+.close-btn{width:28px;height:28px;border-radius:6px;background:var(--bg3);border:none;cursor:pointer;color:var(--text3);font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.close-btn:hover{background:var(--red-bg);color:var(--red)}
+input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
+.pagination{display:flex;align-items:center;gap:4px;padding:12px 16px;border-top:1px solid var(--border);justify-content:space-between}
+.page-btn{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;cursor:pointer;background:var(--bg3);border:1px solid var(--border);color:var(--text2);transition:all .15s}
+.page-btn:hover{background:var(--bg4);color:var(--text)}
+.page-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.page-info{font-size:11px;color:var(--text3)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text3)}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.5}
+.empty-title{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px}
+.toast-container{position:fixed;bottom:20px;left:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;min-width:280px;box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;animation:slideInLeft .3s ease;font-size:13px;font-weight:500}
+.toast.success{border-color:rgba(34,197,94,.3)}.toast.error{border-color:rgba(239,68,68,.3)}.toast.info{border-color:rgba(79,110,247,.3)}
+.upload-zone{border:2px dashed var(--border2);border-radius:var(--radius-lg);padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg3)}
+.upload-zone:hover,.drag-over{border-color:var(--accent);background:var(--accent-glow)}
+.divider{height:1px;background:var(--border);margin:14px 0}
+.note-item{background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.note-text{font-size:12px;color:var(--text)}
+.note-meta{font-size:10px;color:var(--text3);margin-top:4px}
+.log-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.log-item:last-child{border-bottom:none}
+.log-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.bulk-bar{position:fixed;bottom:20px;right:calc(var(--sidebar-w) + 20px);left:20px;background:var(--bg3);border:1px solid var(--accent);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);z-index:200;animation:slideUp .2s ease}
+.bulk-count{font-size:13px;font-weight:700;color:var(--accent)}
+.bulk-actions{margin-right:auto;display:flex;gap:8px}
+.chip{display:inline-flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--text2)}
+.progress-bar{background:var(--bg3);border-radius:4px;height:6px;overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;transition:width .4s}
+.detail-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.detail-value{font-size:13px;font-weight:500;color:var(--text)}
+.loading-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+.spinner-sm{width:20px;height:20px;border-width:2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideInLeft{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+.login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);background-image:radial-gradient(ellipse at 30% 50%,rgba(79,110,247,.08) 0%,transparent 60%)}
+.login-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:36px;width:380px;box-shadow:var(--shadow)}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo-icon{width:54px;height:54px;border-radius:14px;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:12px;box-shadow:0 0 32px var(--accent-glow)}
+.login-title{font-size:20px;font-weight:800;color:var(--text)}
+.login-sub{font-size:12px;color:var(--text3);margin-top:4px}
+.affiliate-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;transition:border-color .2s;cursor:pointer}
+.affiliate-card:hover{border-color:var(--accent)}
+/* RESPONSIVE MOBILE */
+/* Mobile: hide table, show cards instead */
+.order-card{display:none}
+@media (max-width:768px){
+  :root{--sidebar-w:0px}
+  .sidebar{transform:translateX(100%);transition:transform .25s ease;width:75vw;max-width:280px;box-shadow:-6px 0 32px rgba(0,0,0,.6)}
+  .sidebar.open{transform:translateX(0)}
+  .main-content{margin-right:0!important}
+  .topbar{padding:0 12px;gap:8px;height:52px}
+  .topbar-title{font-size:14px}
+  .page{padding:12px}
+  .page-header{flex-direction:column;align-items:flex-start!important;gap:10px;margin-bottom:14px}
+  .page-header > div:last-child{width:100%;display:flex;flex-wrap:wrap;gap:6px}
+  .page-header .btn{flex:1;justify-content:center;font-size:11px;padding:6px 8px}
+  .stats-grid{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .stat-card{padding:12px}
+  .stat-icon{font-size:18px;margin-bottom:4px}
+  .stat-value{font-size:20px}
+  .stat-label{font-size:10px}
+  /* Hide tables on mobile - show cards */
+  .table-wrap table{display:none}
+  .order-card{display:block}
+  .table-toolbar{padding:10px 12px;gap:8px}
+  .table-toolbar .search-input{width:100%!important;min-width:0}
+  .table-toolbar select{flex:1;min-width:0;font-size:11px}
+  .table-toolbar-selects{display:flex;gap:6px;width:100%;flex-wrap:wrap}
+  /* Pagination on mobile */
+  .pagination{flex-wrap:wrap;gap:6px;padding:10px 12px}
+  .page-info{width:100%;text-align:center}
+  /* Bulk bar */
+  .bulk-bar{right:8px!important;left:8px!important;bottom:8px;flex-wrap:wrap;gap:8px;padding:10px 12px}
+  .bulk-actions{flex-wrap:wrap;gap:6px}
+  /* Modals */
+  .modal{margin:0;border-radius:16px 16px 0 0;max-height:95vh}
+  .modal-overlay{align-items:flex-end;padding:0}
+  .modal-lg,.modal-md,.modal-sm{max-width:100%!important}
+  .modal-body{padding:14px}
+  .modal-header{padding:14px 16px}
+  .modal-footer{padding:12px 14px}
+  /* Forms */
+  .form-row{grid-template-columns:1fr!important}
+  /* Login */
+  .login-card{width:95vw;padding:24px 18px}
+  .login-title{font-size:18px}
+  /* Shipping tabs */
+  .ship-tabs{grid-template-columns:1fr 1fr!important}
+  /* Affiliate cards */
+  .affiliate-card{padding:14px}
+  /* Call/WA buttons */
+  .contact-bar{gap:8px}
+  .contact-bar .btn{flex:1;justify-content:center}
+}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
+.overlay.open{display:block}
+.menu-btn{display:none;background:var(--bg3);border:1px solid var(--border);border-radius:8px;width:36px;height:36px;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text);flex-shrink:0}
+@media(max-width:768px){.menu-btn{display:flex}}
+@media print{
+  body{background:#fff!important;color:#000!important;direction:rtl}
+  .no-print{display:none!important}
+  .invoice-page{page-break-after:always}
+  *{-webkit-print-color-adjust:exact;color-adjust:exact}
+}
+.invoice-page{padding:28px 32px;min-height:200mm;max-width:210mm;margin:0 auto;background:#fff;border:1px solid #e5e7eb;font-family:'Cairo',sans-serif;color:#111;direction:rtl}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #111}
+.inv-table{width:100%;border-collapse:collapse;margin-bottom:14px}
+.inv-table th{background:#f3f4f6;padding:8px 12px;text-align:right;font-size:11px;font-weight:700;border:1px solid #e5e7eb}
+.inv-table td{padding:8px 12px;font-size:12px;border:1px solid #e5e7eb}
+.inv-totals{background:#f9fafb;border-radius:8px;padding:12px 16px;margin-bottom:14px}
+.inv-total-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.inv-total-row.grand{font-size:16px;font-weight:800;border-top:2px solid #111;padding-top:8px;margin-top:4px}
+.print-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;display:flex;flex-direction:column;overflow-y:auto;padding:20px}
+.print-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+/* ═══════════════════════════════════
+   SUPABASE
+═══════════════════════════════════ */
+const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+/* ═══════════════════════════════════
+   HELPERS
+═══════════════════════════════════ */
+const uid = () => Math.random().toString(36).slice(2,10);
+const now = () => new Date().toISOString();
+const fmtDate = d => d ? new Date(d).toLocaleDateString('ar-EG',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '-';
+const fmtShort = d => d ? new Date(d).toLocaleDateString('ar-EG',{month:'short',day:'numeric'}) : '-';
+const fmtMoney = n => n!=null ? Number(n).toLocaleString('ar-EG')+' ج' : '-';
+const fmtPrint = () => new Date().toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
+
+const SL = {new:'جديد',pending:'معلق',assigned:'مسند',confirmed:'مؤكد',cancelled:'ملغي',follow_up:'متابعة',shipped:'خرج للشحن',delivered:'تم التسليم',not_delivered:'لم يتسلم'};
+const SC = {new:'badge-new',pending:'badge-pending',assigned:'badge-assigned',confirmed:'badge-confirmed',cancelled:'badge-cancelled',follow_up:'badge-follow_up',shipped:'badge-shipped',delivered:'badge-delivered',not_delivered:'badge-not_delivered'};
+const RL = {admin:'أدمن',call_center:'كول سنتر',shipping:'شحن'};
+const EXCEL_MAP = {'ID':'order_ref','Status':'status','FullName':'customer_name','Phone':'customer_phone','Alt Phone':'customer_alt_phone','City':'city','Address':'customer_address','Total Cost':'total_cost','Product Cost':'product_cost','Shipping Cost':'shipping_cost','Coupon':'coupon','Coupon Discount':'coupon_discount','Product Name':'product_name','Variant':'variant','Quantity':'quantity','SKU':'sku','Item Price':'item_price','Utm Source':'source','Utm Campaign':'utm_campaign','Payment Method':'payment_method','Note':'note','Ref':'referral_code','Order ID':'external_id','External Order ID':'external_id'};
+
+/* ═══════════════════════════════════
+   TOAST
+═══════════════════════════════════ */
+let _toast = null;
+const toast = (msg,type='info') => _toast&&_toast(msg,type);
+const ToastBox = () => {
+  const [list,setList] = useState([]);
+  useEffect(()=>{ _toast=(msg,type)=>{ const id=uid(); setList(t=>[...t,{id,msg,type}]); setTimeout(()=>setList(t=>t.filter(x=>x.id!==id)),3500); }; },[]);
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  return <div className="toast-container">{list.map(t=><div key={t.id} className={`toast ${t.type}`}><span>{icons[t.type]}</span><span>{t.msg}</span></div>)}</div>;
+};
+
+/* ═══════════════════════════════════
+   UI ATOMS
+═══════════════════════════════════ */
+const SBadge = ({status}) => <span className={`badge ${SC[status]||'badge-new'}`}><span className="badge-dot" style={{background:'currentColor'}}/>{SL[status]||status}</span>;
+
+const Modal = ({show,onClose,title,children,size='md',footer}) => {
+  if(!show) return null;
+  return <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div className={`modal modal-${size}`}>
+      <div className="modal-header"><div className="modal-title">{title}</div><button className="close-btn" onClick={onClose}>✕</button></div>
+      <div className="modal-body">{children}</div>
+      {footer&&<div className="modal-footer">{footer}</div>}
+    </div>
+  </div>;
+};
+
+const DEFAULT_PS = 20;
+const Pager = ({total,page,setPage,ps=DEFAULT_PS}) => {
+  const pages = Math.ceil(total/ps);
+  if(pages<=1) return null;
+  const maxBtns = 7;
+  let startP = Math.max(1, page - Math.floor(maxBtns/2));
+  let endP = Math.min(pages, startP + maxBtns - 1);
+  if(endP - startP < maxBtns - 1) startP = Math.max(1, endP - maxBtns + 1);
+  return <div className="pagination">
+    <span className="page-info">إجمالي {total} عنصر — صفحة {page} من {pages}</span>
+    <div style={{display:'flex',gap:4}}>
+      <button className="page-btn" onClick={()=>setPage(1)} disabled={page===1} title="أول صفحة">«</button>
+      <button className="page-btn" onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}>‹</button>
+      {Array.from({length:endP-startP+1},(_,i)=>{const p=startP+i;return <button key={p} className={`page-btn ${page===p?'active':''}`} onClick={()=>setPage(p)}>{p}</button>;})}
+      <button className="page-btn" onClick={()=>setPage(p=>Math.min(pages,p+1))} disabled={page===pages}>›</button>
+      <button className="page-btn" onClick={()=>setPage(pages)} disabled={page===pages} title="آخر صفحة">»</button>
+    </div>
+  </div>;
+};
+
+const Spin = ({sm}) => <div className={`spinner ${sm?'spinner-sm':''}`}/>;
+const Loading = () => <div style={{textAlign:'center',padding:40}}><Spin/></div>;
+
+/* ═══════════════════════════════════
+   INVOICE
+═══════════════════════════════════ */
+const Invoice = ({order,aff,pd}) => {
+  const final = (order.total_cost||0)-(order.discount||0);
+  return <div className="invoice-page">
+    <div className="inv-header">
+      <div><div style={{fontSize:20,fontWeight:900}}>📦 نظام إدارة الأوردرات</div><div style={{fontSize:11,color:'#666',marginTop:2}}>فاتورة / إيصال أوردر</div></div>
+      <div style={{textAlign:'right',fontSize:12}}>
+        <div>رقم الأوردر: <strong>{order.order_ref}</strong></div>
+        {order.external_id&&<div style={{fontSize:10,color:'#888'}}>Ref: {order.external_id}</div>}
+        <div style={{marginTop:4}}>تاريخ الطباعة: <strong>{pd}</strong></div>
+        <div style={{marginTop:6}}><SBadge status={order.status}/></div>
+      </div>
+    </div>
+    {aff&&<div style={{background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:8,padding:12,display:'flex',gap:12,alignItems:'center',marginBottom:14}}>
+      <div style={{width:36,height:36,borderRadius:'50%',background:'#0ea5e9',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:14,flexShrink:0}}>{aff.name.charAt(0)}</div>
+      <div><div style={{fontSize:11,color:'#0369a1',fontWeight:700}}>الأفيلييت المسؤول</div><div style={{fontSize:14,fontWeight:700,color:'#0c4a6e'}}>{aff.name}</div>{aff.phone&&<div style={{fontSize:11,color:'#0369a1'}}>📞 {aff.phone}</div>}</div>
+    </div>}
+    <div style={{marginBottom:14}}>
+      <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#666',marginBottom:8,paddingBottom:4,borderBottom:'1px solid #e5e7eb'}}>بيانات العميل</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <div><div style={{fontSize:10,color:'#888',fontWeight:600}}>الاسم</div><div style={{fontSize:13,fontWeight:600}}>{order.customer_name}</div></div>
+        <div><div style={{fontSize:10,color:'#888',fontWeight:600}}>التليفون</div><div style={{fontSize:13,fontWeight:600,direction:'ltr',textAlign:'right'}}>{order.customer_phone}{order.customer_alt_phone&&` / ${order.customer_alt_phone}`}</div></div>
+        <div><div style={{fontSize:10,color:'#888',fontWeight:600}}>المدينة</div><div style={{fontSize:13,fontWeight:600}}>{order.city||'-'}</div></div>
+        <div><div style={{fontSize:10,color:'#888',fontWeight:600}}>طريقة الدفع</div><div style={{fontSize:13,fontWeight:600}}>{order.payment_method==='cod'?'الدفع عند الاستلام (COD)':order.payment_method||'-'}</div></div>
+      </div>
+      <div style={{marginTop:8,background:'#f9fafb',padding:'8px 10px',borderRadius:6,border:'1px solid #e5e7eb'}}>
+        <div style={{fontSize:10,color:'#888',fontWeight:600,marginBottom:2}}>العنوان الكامل</div>
+        <div style={{fontSize:12,fontWeight:600,lineHeight:1.8}}>{order.customer_address||'-'}</div>
+      </div>
+    </div>
+    <table className="inv-table">
+      <thead><tr><th>المنتج</th><th>المتغير</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
+      <tbody><tr>
+        <td style={{fontWeight:600}}>{order.product_name||'-'}</td>
+        <td>{order.variant||'-'}</td>
+        <td style={{textAlign:'center',fontWeight:700}}>{order.quantity||1}</td>
+        <td style={{fontWeight:600}}>{fmtMoney(order.item_price)}</td>
+        <td style={{fontWeight:700,color:'#1d4ed8'}}>{fmtMoney(order.product_cost)}</td>
+      </tr></tbody>
+    </table>
+    <div className="inv-totals">
+      <div className="inv-total-row"><span>سعر المنتجات</span><span>{fmtMoney(order.product_cost)}</span></div>
+      <div className="inv-total-row"><span>رسوم الشحن</span><span>{fmtMoney(order.shipping_cost||0)}</span></div>
+      {(order.coupon_discount>0)&&<div className="inv-total-row" style={{color:'#16a34a'}}><span>خصم الكوبون{order.coupon?` (${order.coupon})`:''}</span><span>- {fmtMoney(order.coupon_discount)}</span></div>}
+      {(order.discount>0)&&<div className="inv-total-row" style={{color:'#16a34a'}}><span>خصم إضافي</span><span>- {fmtMoney(order.discount)}</span></div>}
+      <div className="inv-total-row grand"><span>الإجمالي المستحق</span><span>{fmtMoney(final)}</span></div>
+    </div>
+    {order.note&&<div style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:8,padding:'10px 14px',marginBottom:14}}>
+      <div style={{fontSize:10,fontWeight:700,color:'#92400e',marginBottom:4}}>ملاحظات</div>
+      <div style={{fontSize:12,color:'#78350f'}}>{order.note}</div>
+    </div>}
+    <div style={{marginTop:20,paddingTop:14,borderTop:'1px solid #e5e7eb',textAlign:'center',fontSize:10,color:'#888'}}>
+      <div>شكراً لتعاملكم معنا — طُبع بتاريخ {pd}</div>
+      <div style={{marginTop:3}}>رقم مرجعي: {order.order_ref}{order.external_id?` | ${order.external_id}`:''}</div>
+    </div>
+  </div>;
+};
+
+const PrintView = ({orders,affs,onClose}) => {
+  const pd = fmtPrint();
+  return <div className="print-bg">
+    <div className="print-toolbar no-print">
+      <button className="btn btn-primary" onClick={()=>window.print()}>🖨️ طباعة ({orders.length} فاتورة)</button>
+      <button className="btn btn-ghost" onClick={onClose}>✕ إغلاق</button>
+      <span style={{fontSize:12,color:'#aaa'}}>تاريخ الطباعة: {pd}</span>
+    </div>
+    <div style={{background:'#fff'}}>
+      {orders.map(o=><Invoice key={o.id} order={o} aff={affs.find(a=>a.id===o.affiliate_id)} pd={pd}/>)}
+    </div>
+  </div>;
+};
+
+/* ═══════════════════════════════════
+   LOGIN
+═══════════════════════════════════ */
+const Login = ({onLogin}) => {
+  const [email,setEmail] = useState('admin@crm.com');
+  const [pw,setPw] = useState('123456');
+  const [err,setErr] = useState('');
+  const [loading,setLoading] = useState(false);
+
+  const go = async () => {
+    setLoading(true); setErr('');
+    const {data,error} = await sb.from('users').select('*').eq('email',email).eq('password',pw).eq('active',true).single();
+    if(error||!data){setErr('بيانات غير صحيحة');setLoading(false);return;}
+    sessionStorage.setItem('crm_u',JSON.stringify(data));
+    onLogin(data);
+  };
+
+  return <div className="login-page">
+    <div className="login-card">
+      <div className="login-logo">
+        <div className="login-logo-icon">🏪</div>
+        <div className="login-title">Dark Store CRM</div>
+        <div className="login-sub">نظام إدارة الأوردرات</div>
+      </div>
+      <div className="form-group"><label className="form-label">البريد الإلكتروني</label><input className="input" type="email" value={email} onChange={e=>setEmail(e.target.value)}/></div>
+      <div className="form-group"><label className="form-label">كلمة المرور</label><input className="input" type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==='Enter'&&go()}/></div>
+      {err&&<div style={{background:'var(--red-bg)',color:'var(--red)',borderRadius:8,padding:'8px 12px',fontSize:12,marginBottom:12}}>{err}</div>}
+      <button className="btn btn-primary" style={{width:'100%',justifyContent:'center',padding:10}} onClick={go} disabled={loading}>
+        {loading?<><Spin sm/>جاري...</>:'🔐 تسجيل الدخول'}
+      </button>
+
+    </div>
+  </div>;
+};
+
+/* ═══════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════ */
+const Dashboard = ({user}) => {
+  const [s,setS] = useState({total:0,new_p:0,confirmed:0,shipped:0,delivered:0,cancelled:0,revenue:0,pending_c:0});
+  const [logs,setLogs] = useState([]);
+  const [loading,setLoading] = useState(true);
+
+  useEffect(()=>{
+    (async()=>{
+      const [{data:o},{data:c},{data:a}] = await Promise.all([
+        sb.from('orders').select('status,total_cost,discount'),
+        sb.from('commissions').select('amount,is_paid'),
+        sb.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(8),
+      ]);
+      const ord=o||[];
+      setS({total:ord.length,new_p:ord.filter(x=>['new','pending'].includes(x.status)).length,confirmed:ord.filter(x=>x.status==='confirmed').length,shipped:ord.filter(x=>x.status==='shipped').length,delivered:ord.filter(x=>x.status==='delivered').length,cancelled:ord.filter(x=>x.status==='cancelled').length,revenue:ord.filter(x=>x.status==='delivered').reduce((t,x)=>t+(x.total_cost||0)-(x.discount||0),0),pending_c:(c||[]).filter(x=>!x.is_paid).reduce((t,x)=>t+x.amount,0)});
+      setLogs(a||[]); setLoading(false);
+    })();
+  },[]);
+
+  if(loading) return <div className="page"><div className="loading-screen" style={{background:'transparent'}}><Spin/></div></div>;
+
+  const cards=[{c:'blue',i:'📦',l:'إجمالي الأوردرات',v:s.total},{c:'yellow',i:'🆕',l:'جديد/معلق',v:s.new_p},{c:'green',i:'✅',l:'مؤكدة',v:s.confirmed},{c:'orange',i:'🚚',l:'في الشحن',v:s.shipped},{c:'green',i:'🏆',l:'مسلمة',v:s.delivered},{c:'red',i:'❌',l:'ملغية',v:s.cancelled},{c:'blue',i:'💰',l:'إيرادات التسليم',v:fmtMoney(s.revenue),sm:true},{c:'yellow',i:'🎯',l:'عمولات معلقة',v:fmtMoney(s.pending_c),sm:true}];
+  const colors=['var(--accent)','var(--green)','var(--orange)','var(--purple)','var(--red)','var(--blue)'];
+
+  return <div className="page">
+    <div className="page-header"><div><div className="page-title">لوحة التحكم 📊</div><div className="page-sub">مرحباً {user.name} — {new Date().toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div></div>
+    <div className="stats-grid">
+      {cards.map((x,i)=><div key={i} className={`stat-card ${x.c}`}><div className="stat-icon">{x.i}</div><div className="stat-label">{x.l}</div><div className="stat-value" style={x.sm?{fontSize:16}:{}}>{x.v}</div></div>)}
+    </div>
+    <div className="table-wrap" style={{padding:20}}>
+      <div style={{fontSize:13,fontWeight:700,color:'var(--text)',marginBottom:16}}>آخر النشاطات</div>
+      {logs.length===0?<div style={{fontSize:12,color:'var(--text3)',textAlign:'center',padding:'20px 0'}}>لا توجد نشاطات بعد</div>:
+      logs.map((log,i)=><div key={log.id} className="log-item">
+        <div className="log-dot" style={{background:colors[i%colors.length]}}/>
+        <div style={{flex:1}}><div style={{fontSize:12,color:'var(--text)',fontWeight:500}}>{log.action}</div><div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>{log.detail}</div></div>
+        <div style={{textAlign:'left'}}><div style={{fontSize:11,fontWeight:600,color:'var(--text2)'}}>{log.user_name}</div><div style={{fontSize:10,color:'var(--text3)'}}>{fmtDate(log.created_at)}</div></div>
+      </div>)}
+    </div>
+  </div>;
+};
+
+/* ═══════════════════════════════════
+   ORDERS PAGE
+═══════════════════════════════════ */
+const OrdersPage = ({user}) => {
+  const [orders,setOrders] = useState([]);
+  const [affs,setAffs] = useState([]);
+  const [users,setUsers] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [search,setSearch] = useState('');
+  const [fStatus,setFStatus] = useState('');
+  const [fAff,setFAff] = useState('');
+  const [fAssigned,setFAssigned] = useState('');
+  const [dateFrom,setDateFrom] = useState('');
+  const [dateTo,setDateTo] = useState('');
+  const [sortBy,setSortBy] = useState('created_at');
+  const [sortDir,setSortDir] = useState('desc');
+  const [ps,setPs] = useState(20);
+  const [page,setPage] = useState(1);
+  const [sel,setSel] = useState([]);
+  const [showAdvanced,setShowAdvanced] = useState(false);
+  const [modals,setModals] = useState({import:false,add:false,detail:null,edit:null,assign:null,bulkAssign:false});
+  const [printList,setPrint] = useState(null);
+  const setM = (k,v) => setModals(m=>({...m,[k]:v}));
+
+  const load = useCallback(async()=>{
+    setLoading(true);
+    const [a,u,o] = await Promise.all([
+      sb.from('affiliates').select('*').order('name'),
+      sb.from('users').select('*').order('name'),
+      user.role==='call_center'
+        ? sb.from('orders').select('*').eq('assigned_to',user.id).order('created_at',{ascending:false})
+        : sb.from('orders').select('*').order('created_at',{ascending:false}),
+    ]);
+    setAffs(a.data||[]); setUsers(u.data||[]); setOrders(o.data||[]); setLoading(false);
+  },[user]);
+
+  useEffect(()=>{load();},[load]);
+
+  const filtered = useMemo(()=>{
+    let res = orders.filter(o=>{
+      if(search&&!`${o.order_ref} ${o.customer_name} ${o.customer_phone} ${o.city} ${o.product_name} ${o.customer_address}`.toLowerCase().includes(search.toLowerCase())) return false;
+      if(fStatus&&o.status!==fStatus) return false;
+      if(fAff&&o.affiliate_id!==fAff) return false;
+      if(fAssigned==='__unassigned__'&&o.assigned_to) return false;
+      else if(fAssigned&&fAssigned!=='__unassigned__'&&o.assigned_to!==fAssigned) return false;
+      if(dateFrom&&o.created_at&&o.created_at<dateFrom) return false;
+      if(dateTo&&o.created_at&&o.created_at>dateTo+'T23:59:59') return false;
+      return true;
+    });
+    // Sort
+    res = [...res].sort((a,b)=>{
+      let av = a[sortBy], bv = b[sortBy];
+      if(av==null) av=''; if(bv==null) bv='';
+      if(typeof av==='number'&&typeof bv==='number') return sortDir==='asc'?av-bv:bv-av;
+      return sortDir==='asc'?String(av).localeCompare(String(bv),'ar'):String(bv).localeCompare(String(av),'ar');
+    });
+    return res;
+  },[orders,search,fStatus,fAff,fAssigned,dateFrom,dateTo,sortBy,sortDir]);
+
+  const paged = filtered.slice((page-1)*ps, page*ps);
+  const allChk = paged.length>0&&paged.every(o=>sel.includes(o.id));
+  const ccUsers = users.filter(u=>u.role==='call_center'&&u.active);
+
+  // Sort toggle helper
+  const doSort = (col) => {
+    if(sortBy===col) setSortDir(d=>d==='asc'?'desc':'asc');
+    else { setSortBy(col); setSortDir('asc'); }
+    setPage(1);
+  };
+  const SortIcon = ({col}) => sortBy===col ? (sortDir==='asc'?'↑':'↓') : '⇅';
+
+  const doStatus = async (ordId,status) => {
+    const o = orders.find(x=>x.id===ordId);
+    await sb.from('orders').update({status,updated_at:now()}).eq('id',ordId);
+    await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'تحديث حالة',entity:'order',detail:`${o?.order_ref}: ${SL[o?.status]} → ${SL[status]}`,created_at:now()});
+    toast(`تم التحديث إلى "${SL[status]}"`,'success'); load();
+  };
+
+  const ccAllow=['confirmed','cancelled','follow_up'];
+  const shipAllow=['shipped','delivered','not_delivered'];
+  const getActs=o=>{
+    if(user.role==='call_center') return ccAllow.filter(s=>s!==o.status);
+    if(user.role==='shipping') return shipAllow.filter(s=>s!==o.status);
+    return[];
+  };
+  const canEdit=o=>user.role==='admin'||(user.role==='call_center'&&o.assigned_to===user.id);
+
+  if(printList) return <PrintView orders={printList} affs={affs} onClose={()=>setPrint(null)}/>;
+
+  return <div className="page">
+    <div className="page-header">
+      <div><div className="page-title">{user.role==='call_center'?'أوردراتي':'إدارة الأوردرات'} 📋</div><div className="page-sub">{filtered.length} أوردر</div></div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        {sel.length>0&&<button className="btn btn-ghost" onClick={()=>setPrint(orders.filter(o=>sel.includes(o.id)))}>🖨️ طباعة ({sel.length})</button>}
+        {user.role==='admin'&&<>
+          <button className="btn btn-ghost" onClick={()=>exportConfirmedOrders(orders.filter(o=>o.status==='confirmed'),affs)}>📥 تصدير مؤكدة</button>
+          <button className="btn btn-ghost" onClick={()=>setM('add',true)}>➕ إضافة</button>
+          <button className="btn btn-primary" onClick={()=>setM('import',true)}>📤 استيراد Excel</button>
+        </>}
+      </div>
+    </div>
+
+    <div className="table-wrap">
+      <div className="table-toolbar" style={{flexDirection:'column',gap:8}}>
+        {/* Row 1: Search + page size + advanced toggle */}
+        <div style={{display:'flex',gap:8,width:'100%',alignItems:'center'}}>
+          <input className="input" style={{flex:1}} placeholder="🔍 بحث في الاسم، التليفون، رقم الأوردر، العنوان..." value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}}/>
+          <select className="input select" style={{width:90,flexShrink:0}} value={ps} onChange={e=>{setPs(Number(e.target.value));setPage(1)}} title="عدد الأوردرات في الصفحة">
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+          </select>
+          <button className={`btn btn-sm ${showAdvanced?'btn-primary':'btn-ghost'}`} onClick={()=>setShowAdvanced(s=>!s)} title="فلاتر متقدمة">
+            {showAdvanced?'▲':'▼'} فلتر
+          </button>
+        </div>
+        {/* Row 2: Status + basic filters */}
+        <div style={{display:'flex',gap:8,width:'100%',flexWrap:'wrap'}}>
+          <select className="input select" style={{flex:1,minWidth:110}} value={fStatus} onChange={e=>{setFStatus(e.target.value);setPage(1)}}>
+            <option value="">كل الحالات</option>
+            {Object.entries(SL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+          </select>
+          {user.role==='admin'&&<>
+            <select className="input select" style={{flex:1,minWidth:120}} value={fAff} onChange={e=>{setFAff(e.target.value);setPage(1)}}>
+              <option value="">كل الأفيليتس</option>
+              {affs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            <select className="input select" style={{flex:1,minWidth:120}} value={fAssigned} onChange={e=>{setFAssigned(e.target.value);setPage(1)}}>
+              <option value="">كل الموظفين</option>
+              <option value="__unassigned__">غير مسند</option>
+              {ccUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </>}
+          {(fStatus||fAff||fAssigned||dateFrom||dateTo||search)&&<button className="btn btn-danger btn-sm" onClick={()=>{setSearch('');setFStatus('');setFAff('');setFAssigned('');setDateFrom('');setDateTo('');setPage(1);}} title="مسح الفلاتر">✕ مسح</button>}
+        </div>
+        {/* Row 3: Advanced filters (date + sort) */}
+        {showAdvanced&&<div style={{background:'var(--bg3)',borderRadius:10,padding:12,display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div style={{flex:1,minWidth:140}}>
+            <div style={{fontSize:10,fontWeight:700,color:'var(--text3)',marginBottom:4,textTransform:'uppercase'}}>تاريخ الإضافة من</div>
+            <input className="input" type="date" value={dateFrom} onChange={e=>{setDateFrom(e.target.value);setPage(1);}}/>
+          </div>
+          <div style={{flex:1,minWidth:140}}>
+            <div style={{fontSize:10,fontWeight:700,color:'var(--text3)',marginBottom:4,textTransform:'uppercase'}}>تاريخ الإضافة إلى</div>
+            <input className="input" type="date" value={dateTo} onChange={e=>{setDateTo(e.target.value);setPage(1);}}/>
+          </div>
+          <div style={{flex:1,minWidth:140}}>
+            <div style={{fontSize:10,fontWeight:700,color:'var(--text3)',marginBottom:4,textTransform:'uppercase'}}>ترتيب حسب</div>
+            <select className="input select" value={sortBy} onChange={e=>{setSortBy(e.target.value);setPage(1);}}>
+              <option value="created_at">تاريخ الإضافة</option>
+              <option value="updated_at">آخر تحديث</option>
+              <option value="customer_name">اسم العميل</option>
+              <option value="city">المحافظة</option>
+              <option value="total_cost">الإجمالي</option>
+              <option value="status">الحالة</option>
+              <option value="order_ref">رقم الأوردر</option>
+              <option value="product_name">اسم المنتج</option>
+            </select>
+          </div>
+          <div style={{flex:1,minWidth:100}}>
+            <div style={{fontSize:10,fontWeight:700,color:'var(--text3)',marginBottom:4,textTransform:'uppercase'}}>الاتجاه</div>
+            <select className="input select" value={sortDir} onChange={e=>{setSortDir(e.target.value);setPage(1);}}>
+              <option value="desc">↓ تنازلي</option>
+              <option value="asc">↑ تصاعدي</option>
+            </select>
+          </div>
+          {(dateFrom||dateTo)&&<button className="btn btn-ghost btn-sm" onClick={()=>{setDateFrom('');setDateTo('');}} style={{flexShrink:0}}>✕ مسح التاريخ</button>}
+        </div>}
+        {/* Active filters summary */}
+        {(fStatus||fAff||fAssigned||dateFrom||dateTo)&&<div style={{display:'flex',gap:6,flexWrap:'wrap',fontSize:11}}>
+          {fStatus&&<span className="chip">الحالة: {SL[fStatus]} <button onClick={()=>setFStatus('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text3)',marginRight:4}}>✕</button></span>}
+          {fAff&&<span className="chip">أفيلييت: {affs.find(a=>a.id===fAff)?.name} <button onClick={()=>setFAff('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text3)',marginRight:4}}>✕</button></span>}
+          {fAssigned&&<span className="chip">موظف: {fAssigned==='__unassigned__'?'غير مسند':ccUsers.find(u=>u.id===fAssigned)?.name} <button onClick={()=>setFAssigned('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text3)',marginRight:4}}>✕</button></span>}
+          {dateFrom&&<span className="chip">من: {dateFrom} <button onClick={()=>setDateFrom('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text3)',marginRight:4}}>✕</button></span>}
+          {dateTo&&<span className="chip">إلى: {dateTo} <button onClick={()=>setDateTo('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--text3)',marginRight:4}}>✕</button></span>}
+        </div>}
+      </div>
+
+      {loading?<Loading/>:paged.length===0?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-title">لا توجد أوردرات</div></div>:<>
+        {/* DESKTOP TABLE */}
+        <div style={{overflowX:'auto'}}>
+          <table>
+            <thead><tr>
+              <th className="td-check"><input type="checkbox" checked={allChk} onChange={()=>setSel(allChk?[]:paged.map(o=>o.id))}/></th>
+              <th style={{cursor:'pointer',userSelect:'none'}} onClick={()=>doSort('order_ref')}>ID <SortIcon col="order_ref"/></th>
+              <th style={{cursor:'pointer',userSelect:'none'}} onClick={()=>doSort('customer_name')}>العميل <SortIcon col="customer_name"/></th>
+              <th style={{cursor:'pointer',userSelect:'none'}} onClick={()=>doSort('city')}>المدينة <SortIcon col="city"/></th>
+              <th style={{cursor:'pointer',userSelect:'none'}} onClick={()=>doSort('product_name')}>المنتج <SortIcon col="product_name"/></th>
+              <th style={{cursor:'pointer',userSelect:'none'}} onClick={()=>doSort('total_cost')}>الإجمالي <SortIcon col="total_cost"/></th>
+              <th style={{cursor:'pointer',userSelect:'none'}} onClick={()=>doSort('status')}>الحالة <SortIcon col="status"/></th>
+              <th>الأفيلييت</th>
+              <th>المسند لـ</th>
+              <th style={{cursor:'pointer',userSelect:'none'}} onClick={()=>doSort('created_at')}>التاريخ <SortIcon col="created_at"/></th>
+              <th>إجراء</th>
+            </tr></thead>
+            <tbody>
+              {paged.map(o=>{
+                const aff=affs.find(a=>a.id===o.affiliate_id);
+                const au=users.find(u=>u.id===o.assigned_to);
+                const isSel=sel.includes(o.id);
+                const fp=(o.total_cost||0)-(o.discount||0);
+                const acts=getActs(o);
+                return <tr key={o.id} className={isSel?'selected':''} onClick={()=>setM('detail',o)}>
+                  <td className="td-check" onClick={e=>{e.stopPropagation();setSel(s=>s.includes(o.id)?s.filter(x=>x!==o.id):[...s,o.id])}}><input type="checkbox" checked={isSel} onChange={()=>{}}/></td>
+                  <td className="bold" style={{fontSize:11}}>{o.order_ref}</td>
+                  <td><div style={{fontWeight:600,color:'var(--text)',fontSize:12}}>{o.customer_name}</div><div style={{fontSize:10,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div></td>
+                  <td style={{fontSize:11}}>{o.city||'-'}</td>
+                  <td style={{maxWidth:130,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11}}>{o.product_name||'-'}</td>
+                  <td><div style={{fontWeight:700,color:'var(--accent)',fontSize:12}}>{fmtMoney(fp)}</div>{o.discount>0&&<div style={{fontSize:9,color:'var(--green)'}}>خصم {fmtMoney(o.discount)}</div>}</td>
+                  <td><SBadge status={o.status}/></td>
+                  <td>{aff?<span className="chip">{aff.name}</span>:'-'}</td>
+                  <td style={{fontSize:11,color:'var(--text2)'}}>{au?.name||<span style={{color:'var(--text3)'}}>-</span>}</td>
+                  <td style={{fontSize:10,color:'var(--text3)'}}>{fmtShort(o.created_at)}</td>
+                  <td onClick={e=>e.stopPropagation()}>
+                    <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+                      {canEdit(o)&&<button className="btn btn-warning btn-xs" onClick={()=>setM('edit',o)}>✏️</button>}
+                      <button className="btn btn-ghost btn-xs" onClick={()=>setPrint([o])}>🖨️</button>
+                      {user.role==='admin'&&!o.assigned_to&&<button className="btn btn-ghost btn-xs" onClick={()=>setM('assign',o)}>توزيع</button>}
+                      {acts.map(s=><button key={s} className="btn btn-ghost btn-xs" onClick={()=>doStatus(o.id,s)}>{SL[s]}</button>)}
+                    </div>
+                  </td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+        {/* MOBILE CARDS */}
+        <div className="order-card" style={{padding:'8px 10px'}}>
+          {paged.map(o=>{
+            const aff=affs.find(a=>a.id===o.affiliate_id);
+            const au=users.find(u=>u.id===o.assigned_to);
+            const isSel=sel.includes(o.id);
+            const fp=(o.total_cost||0)-(o.discount||0);
+            const acts=getActs(o);
+            const rawPhone=(o.customer_phone||'').replace(/\D/g,'');
+            const intlPhone=rawPhone.startsWith('0')?'2'+rawPhone:rawPhone;
+            return <div key={o.id} style={{background:isSel?'var(--accent-glow)':'var(--bg3)',border:`1px solid ${isSel?'var(--accent)':'var(--border)'}`,borderRadius:12,padding:14,marginBottom:10,transition:'all .15s'}}>
+              {/* Card header */}
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                <input type="checkbox" checked={isSel} onChange={()=>setSel(s=>s.includes(o.id)?s.filter(x=>x!==o.id):[...s,o.id])} onClick={e=>e.stopPropagation()}/>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    <span style={{fontWeight:800,color:'var(--text)',fontSize:13}}>#{o.order_ref}</span>
+                    <SBadge status={o.status}/>
+                    {aff&&<span className="chip" style={{fontSize:9}}>🎯 {aff.name}</span>}
+                  </div>
+                  <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>{fmtShort(o.created_at)}</div>
+                </div>
+                <div style={{fontWeight:800,color:'var(--accent)',fontSize:15}}>{fmtMoney(fp)}</div>
+              </div>
+              {/* Customer info */}
+              <div style={{background:'var(--bg2)',borderRadius:8,padding:'10px 12px',marginBottom:10}}>
+                <div style={{fontWeight:700,color:'var(--text)',fontSize:14,marginBottom:4}}>{o.customer_name}</div>
+                <div style={{fontSize:12,color:'var(--text2)',direction:'ltr',textAlign:'right',marginBottom:2}}>{o.customer_phone}</div>
+                {o.city&&<div style={{fontSize:11,color:'var(--text3)'}}>📍 {o.city}{o.customer_address&&` — ${o.customer_address.substring(0,40)}${o.customer_address.length>40?'...':''}`}</div>}
+              </div>
+              {/* Product */}
+              {o.product_name&&<div style={{fontSize:12,color:'var(--text2)',marginBottom:10,display:'flex',alignItems:'center',gap:6}}>
+                <span style={{color:'var(--text3)'}}>📦</span>
+                <span style={{flex:1}}>{o.product_name}</span>
+                <span style={{color:'var(--text3)',fontSize:11}}>×{o.quantity||1}</span>
+              </div>}
+              {au&&<div style={{fontSize:11,color:'var(--text3)',marginBottom:10}}>👤 مسند لـ: <span style={{color:'var(--text2)',fontWeight:600}}>{au.name}</span></div>}
+              {/* Quick contact */}
+              <div style={{display:'flex',gap:8,marginBottom:10}}>
+                <a href={`tel:${o.customer_phone}`} className="btn btn-success btn-sm" style={{flex:1,justifyContent:'center',textDecoration:'none'}}>📞 اتصال</a>
+                <a href={`https://wa.me/${intlPhone}?text=${encodeURIComponent('مرحباً '+o.customer_name+'، بخصوص طلبكم رقم '+o.order_ref)}`} target="_blank" rel="noreferrer" className="btn btn-sm" style={{flex:1,justifyContent:'center',background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
+              </div>
+              {/* Actions */}
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center'}} onClick={()=>setM('detail',o)}>👁️ تفاصيل</button>
+                {canEdit(o)&&<button className="btn btn-warning btn-sm" style={{flex:1,justifyContent:'center'}} onClick={()=>setM('edit',o)}>✏️ تعديل</button>}
+                {user.role==='admin'&&!o.assigned_to&&<button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center'}} onClick={()=>setM('assign',o)}>📋 توزيع</button>}
+                {acts.slice(0,2).map(s=><button key={s} className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center'}} onClick={()=>doStatus(o.id,s)}>{SL[s]}</button>)}
+              </div>
+            </div>;
+          })}
+        </div>
+        <div style={{borderTop:'1px solid var(--border)',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+          <span style={{fontSize:11,color:'var(--text3)'}}>عرض {Math.min((page-1)*ps+1, filtered.length)}–{Math.min(page*ps, filtered.length)} من {filtered.length} أوردر</span>
+          <Pager total={filtered.length} page={page} setPage={setPage} ps={ps}/>
+        </div>
+      </>}
+    </div>
+
+    {sel.length>0&&<div className="bulk-bar">
+      <span className="bulk-count">{sel.length} محدد</span>
+      <div className="bulk-actions">
+        <button className="btn btn-ghost btn-sm" onClick={()=>setPrint(orders.filter(o=>sel.includes(o.id)))}>🖨️ طباعة</button>
+        {user.role==='admin'&&<button className="btn btn-primary btn-sm" onClick={()=>setM('bulkAssign',true)}>📋 توزيع</button>}
+        <button className="btn btn-ghost btn-sm" onClick={()=>setSel([])}>✕</button>
+      </div>
+    </div>}
+
+    {modals.detail&&<DetailModal order={modals.detail} user={user} affs={affs} users={users} doStatus={doStatus} onEdit={()=>{setM('edit',modals.detail);setM('detail',null);}} onPrint={()=>{setPrint([modals.detail]);setM('detail',null);}} onClose={()=>{setM('detail',null);load();}}/>}
+    {modals.edit&&<EditModal order={modals.edit} user={user} affs={affs} onClose={()=>{setM('edit',null);load();}}/>}
+    {modals.import&&<ImportModal user={user} affs={affs} onClose={()=>{setM('import',false);load();}}/>}
+    {modals.add&&<AddModal user={user} affs={affs} onClose={()=>{setM('add',false);load();}}/>}
+    {modals.assign&&<AssignModal order={modals.assign} ccUsers={ccUsers} user={user} onClose={()=>{setM('assign',null);load();}}/>}
+    {modals.bulkAssign&&<BulkAssignModal orderIds={sel} ccUsers={ccUsers} user={user} onClose={()=>{setM('bulkAssign',false);setSel([]);load();}}/>}
+  </div>;
+};
+
+/* ═══════════════════════════════════
+   DETAIL MODAL
+═══════════════════════════════════ */
+const DetailModal = ({order,user,affs,users,doStatus,onEdit,onPrint,onClose}) => {
+  const [notes,setNotes] = useState([]);
+  const [note,setNote] = useState('');
+  const aff = affs.find(a=>a.id===order.affiliate_id);
+  const au = users.find(u=>u.id===order.assigned_to);
+
+  useEffect(()=>{
+    sb.from('order_notes').select('*').eq('order_id',order.id).order('created_at').then(({data})=>setNotes(data||[]));
+  },[order.id]);
+
+  const addNote = async () => {
+    if(!note.trim()) return;
+    const n={id:uid(),order_id:order.id,user_id:user.id,user_name:user.name,note:note.trim(),created_at:now()};
+    await sb.from('order_notes').insert(n);
+    setNotes(p=>[...p,n]); setNote('');
+    toast('تم إضافة الملاحظة','success');
+  };
+
+  const avail = (()=>{
+    const all=Object.keys(SL).filter(s=>s!==order.status);
+    if(user.role==='admin') return all;
+    if(user.role==='call_center'&&order.assigned_to===user.id) return ['confirmed','cancelled','follow_up'].filter(s=>s!==order.status);
+    if(user.role==='shipping') return ['shipped','delivered','not_delivered'].filter(s=>s!==order.status);
+    return[];
+  })();
+
+  return <Modal show={true} onClose={onClose} title={`تفاصيل الأوردر — ${order.order_ref}`} size="lg">
+    {/* Status + info chips */}
+    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
+      <SBadge status={order.status}/>
+      {aff&&<span className="chip">🎯 {aff.name}</span>}
+      {au&&<span className="chip">👤 {au.name}</span>}
+      {order.source&&<span className="chip">📡 {order.source}</span>}
+      <div style={{marginRight:'auto',display:'flex',gap:6}}>
+        {(user.role==='admin'||(user.role==='call_center'&&order.assigned_to===user.id))&&<button className="btn btn-warning btn-sm" onClick={onEdit}>✏️ تعديل</button>}
+        <button className="btn btn-ghost btn-sm" onClick={onPrint}>🖨️ طباعة</button>
+      </div>
+    </div>
+    {/* Call / WhatsApp quick actions */}
+    {order.customer_phone&&(()=>{
+      const rawPhone = order.customer_phone.replace(/\D/g,'');
+      const intlPhone = rawPhone.startsWith('0') ? '2'+rawPhone : rawPhone;
+      const waMsg = encodeURIComponent(`مرحباً ${order.customer_name}، بخصوص طلبكم رقم ${order.order_ref}`);
+      return <div className="contact-bar" style={{display:'flex',gap:10,marginBottom:14,padding:'10px 12px',background:'var(--bg3)',borderRadius:10,border:'1px solid var(--border)'}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:10,color:'var(--text3)',fontWeight:700,marginBottom:2}}>رقم العميل</div>
+          <div style={{fontSize:14,fontWeight:700,color:'var(--text)',direction:'ltr',textAlign:'right'}}>{order.customer_phone}{order.customer_alt_phone&&<span style={{fontSize:11,color:'var(--text3)',marginRight:8}}> / {order.customer_alt_phone}</span>}</div>
+        </div>
+        <a href={`tel:${order.customer_phone}`} className="btn btn-success btn-sm" style={{textDecoration:'none',flexShrink:0}}>
+          📞 اتصال
+        </a>
+        <a href={`https://wa.me/${intlPhone}?text=${waMsg}`} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:'#25D366',color:'#fff',textDecoration:'none',flexShrink:0}}>
+          💬 واتساب
+        </a>
+        {order.customer_alt_phone&&(()=>{
+          const r2=order.customer_alt_phone.replace(/\D/g,'');
+          return <a href={`tel:${order.customer_alt_phone}`} className="btn btn-ghost btn-sm" style={{textDecoration:'none',flexShrink:0}}>
+            📞 بديل
+          </a>;
+        })()}
+      </div>;
+    })()}
+    {avail.length>0&&<div style={{background:'var(--bg3)',borderRadius:8,padding:12,marginBottom:14}}>
+      <div style={{fontSize:11,color:'var(--text3)',marginBottom:8,fontWeight:700}}>تغيير الحالة:</div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{avail.map(s=><button key={s} className="btn btn-ghost btn-sm" onClick={()=>{doStatus(order.id,s);onClose();}}>{SL[s]}</button>)}</div>
+    </div>}
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
+      {[['رقم الأوردر',order.order_ref],['التليفون',(order.customer_phone+(order.customer_alt_phone?` / ${order.customer_alt_phone}`:''))],['اسم العميل',order.customer_name],['المحافظة',order.city||'-'],].map(([l,v])=><div key={l}><div className="detail-label">{l}</div><div className="detail-value">{v}</div></div>)}
+      <div style={{gridColumn:'1/-1'}}><div className="detail-label">العنوان</div><div className="detail-value">{order.customer_address||'-'}</div></div>
+      <div className="divider" style={{gridColumn:'1/-1'}}/>
+      {[['المنتج',order.product_name||'-'],['الكمية',order.quantity],['سعر الوحدة',fmtMoney(order.item_price)],['الإجمالي',fmtMoney(order.product_cost)],['شحن',fmtMoney(order.shipping_cost||0)],['المستحق',fmtMoney((order.total_cost||0)-(order.discount||0))],].map(([l,v])=><div key={l}><div className="detail-label">{l}</div><div className="detail-value" style={l==='المستحق'?{color:'var(--accent)',fontWeight:800,fontSize:15}:{}}>{v}</div></div>)}
+      {order.discount>0&&<div><div className="detail-label">خصم إضافي</div><div className="detail-value" style={{color:'var(--green)'}}>- {fmtMoney(order.discount)}</div></div>}
+    </div>
+    {order.note&&<div style={{background:'var(--yellow-bg)',borderRadius:8,padding:10,marginBottom:12}}><div style={{fontSize:10,fontWeight:700,color:'var(--yellow)',marginBottom:4}}>ملاحظات الأوردر</div><div style={{fontSize:12,color:'var(--text)'}}>{order.note}</div></div>}
+    <div className="divider"/>
+    <div style={{marginBottom:10,fontSize:13,fontWeight:700,color:'var(--text)'}}>💬 ملاحظات الكول سنتر</div>
+    <div style={{maxHeight:180,overflowY:'auto',marginBottom:12}}>
+      {notes.length===0?<div style={{fontSize:12,color:'var(--text3)',textAlign:'center',padding:'16px 0'}}>لا توجد ملاحظات</div>:notes.map(n=><div key={n.id} className="note-item"><div className="note-text">{n.note}</div><div className="note-meta">{n.user_name} · {fmtDate(n.created_at)}</div></div>)}
+    </div>
+    {(user.role==='admin'||user.role==='call_center')&&<div style={{display:'flex',gap:8}}>
+      <input className="input" placeholder="اكتب ملاحظة..." value={note} onChange={e=>setNote(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addNote()}/>
+      <button className="btn btn-primary" onClick={addNote}>إضافة</button>
+    </div>}
+  </Modal>;
+};
+
+/* ═══════════════════════════════════
+   EDIT MODAL
+═══════════════════════════════════ */
+const EditModal = ({order,user,affs,onClose}) => {
+  const [f,setF] = useState({...order});
+  const [saving,setSaving] = useState(false);
+  const sf = (k,v) => setF(x=>({...x,[k]:v}));
+
+  const save = async () => {
+    setSaving(true);
+    const {error} = await sb.from('orders').update({...f,updated_at:now()}).eq('id',order.id);
+    if(error){toast('حدث خطأ: '+error.message,'error');setSaving(false);return;}
+    await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'تعديل أوردر',entity:'order',detail:`تعديل ${order.order_ref}`,created_at:now()});
+    toast('تم الحفظ ✅','success'); onClose();
+  };
+
+  const inp = (label,key,type='text',fullRow=false) => (
+    <div className="form-group" style={fullRow?{gridColumn:'1/-1'}:{}}>
+      <label className="form-label">{label}</label>
+      {type==='textarea'?<textarea className="input" rows={2} value={f[key]||''} onChange={e=>sf(key,e.target.value)} style={{resize:'vertical'}}/>
+      :<input className="input" type={type} value={f[key]||''} onChange={e=>sf(key,type==='number'?(parseFloat(e.target.value)||0):e.target.value)}/>}
+    </div>
+  );
+
+  return <Modal show={true} onClose={onClose} title={`✏️ تعديل — ${order.order_ref}`} size="lg"
+    footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving?'⏳...':'💾 حفظ'}</button></>}>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+      {inp('اسم العميل','customer_name')}
+      {inp('التليفون','customer_phone')}
+      {inp('تليفون بديل','customer_alt_phone')}
+      {inp('المحافظة','city')}
+      {inp('العنوان','customer_address','textarea',true)}
+      {inp('اسم المنتج','product_name',undefined,true)}
+      {inp('المتغير','variant')}
+      {inp('SKU','sku')}
+      {inp('الكمية','quantity','number')}
+      {inp('سعر الوحدة','item_price','number')}
+      {inp('تكلفة المنتج','product_cost','number')}
+      {inp('رسوم الشحن','shipping_cost','number')}
+      {inp('الإجمالي','total_cost','number')}
+      <div className="form-group"><label className="form-label">خصم إضافي 🏷️</label><input className="input" type="number" value={f.discount||0} onChange={e=>sf('discount',parseFloat(e.target.value)||0)} style={{borderColor:'var(--green)'}}/></div>
+      {inp('المصدر','source')}
+      <div className="form-group"><label className="form-label">طريقة الدفع</label>
+        <select className="input select" value={f.payment_method||'cod'} onChange={e=>sf('payment_method',e.target.value)}>
+          <option value="cod">COD - الدفع عند الاستلام</option>
+          <option value="online">أونلاين</option>
+          <option value="bank">تحويل بنكي</option>
+        </select>
+      </div>
+      {user.role==='admin'&&<>
+        <div className="form-group"><label className="form-label">الأفيلييت</label>
+          <select className="input select" value={f.affiliate_id||''} onChange={e=>sf('affiliate_id',e.target.value)}>
+            <option value="">بدون أفيلييت</option>
+            {affs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </div>
+        <div className="form-group"><label className="form-label">الحالة</label>
+          <select className="input select" value={f.status} onChange={e=>sf('status',e.target.value)}>
+            {Object.entries(SL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+      </>}
+      {inp('ملاحظات','note','textarea',true)}
+    </div>
+  </Modal>;
+};
+
+/* ═══════════════════════════════════
+   IMPORT MODAL
+═══════════════════════════════════ */
+const ImportModal = ({user,affs,onClose}) => {
+  const [step,setStep] = useState(1);
+  const [rows,setRows] = useState([]);
+  const [errs,setErrs] = useState([]);
+  const [fname,setFname] = useState('');
+  const [drag,setDrag] = useState(false);
+  const [defAff,setDefAff] = useState('');
+  const [defCC,setDefCC] = useState('');
+  const [ccUsers,setCCUsers] = useState([]);
+  const [importing,setImporting] = useState(false);
+  const ref = useRef();
+  useEffect(()=>{
+    sb.from('users').select('id,name').eq('role','call_center').eq('active',true).order('name').then(({data})=>setCCUsers(data||[]));
+  },[]);
+
+  const handleFile = async file => {
+    if(!file) return;
+    setFname(file.name);
+    const reader = new FileReader();
+    reader.onload = async e => {
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      const {data:ex}=await sb.from('orders').select('order_ref');
+      const exist=new Set((ex||[]).map(o=>String(o.order_ref)));
+      const ers=[],valid=[];
+      data.forEach((row,i)=>{
+        const m={};
+        Object.entries(row).forEach(([k,v])=>{const fld=EXCEL_MAP[k];if(fld)m[fld]=v;});
+        const ref2=String(m.order_ref||row['ID']||'').trim();
+        const name=String(m.customer_name||row['FullName']||'').trim();
+        if(!ref2){ers.push(`صف ${i+2}: ID مفقود`);return;}
+        if(!name){ers.push(`صف ${i+2}: اسم العميل مفقود`);return;}
+        if(exist.has(ref2)){ers.push(`صف ${i+2}: ${ref2} موجود مسبقاً`);return;}
+        let ca=now();
+        if(m.created_at){const n=parseFloat(m.created_at);if(!isNaN(n)&&n>40000)ca=new Date((n-25569)*86400*1000).toISOString();}
+        valid.push({id:uid(),order_ref:ref2,external_id:String(m.external_id||'').trim(),customer_name:name,customer_phone:String(m.customer_phone||'').trim(),customer_alt_phone:String(m.customer_alt_phone||'').trim(),city:String(m.city||'').trim(),customer_address:String(m.customer_address||'').trim(),product_name:String(m.product_name||'').trim(),variant:String(m.variant||'').trim(),sku:String(m.sku||'').trim(),quantity:parseInt(m.quantity||1)||1,item_price:parseFloat(m.item_price||0)||0,total_cost:parseFloat(m.total_cost||0)||0,product_cost:parseFloat(m.product_cost||0)||0,shipping_cost:parseFloat(m.shipping_cost||0)||0,coupon:String(m.coupon||'').trim(),coupon_discount:parseFloat(m.coupon_discount||0)||0,discount:0,source:String(m.source||'').trim(),utm_campaign:String(m.utm_campaign||'').trim(),payment_method:String(m.payment_method||'cod').trim(),note:String(m.note||'').trim(),referral_code:String(m.referral_code||'').trim(),status:'new',affiliate_id:null,assigned_to:null,created_at:ca,updated_at:now()});
+      });
+      setRows(valid);setErrs(ers);setStep(2);
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const confirm = async () => {
+    setImporting(true);
+    const status = defCC ? 'assigned' : 'new';
+    const ins=rows.map(r=>({...r,affiliate_id:defAff||null,assigned_to:defCC||null,status}));
+    for(let i=0;i<ins.length;i+=100){
+      const {error}=await sb.from('orders').insert(ins.slice(i,i+100));
+      if(error){toast('خطأ: '+error.message,'error');setImporting(false);return;}
+    }
+    const ccName = ccUsers.find(u=>u.id===defCC)?.name||'';
+    const detail = `تم استيراد ${rows.length} أوردر من ${fname}${defAff?' | أفيلييت: '+affs.find(a=>a.id===defAff)?.name:''}${defCC?' | مسند لـ: '+ccName:''}`;
+    await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'استيراد أوردرات',entity:'orders',detail,created_at:now()});
+    toast(`تم استيراد ${rows.length} أوردر ✅`,'success'); onClose();
+  };
+
+  const dlTemplate = () => {
+    const ws=XLSX.utils.json_to_sheet([{ID:'17600',Status:'pending',FullName:'اسم العميل',Phone:'01012345678','Alt Phone':'',City:'القاهرة',Address:'العنوان','Total Cost':650,'Product Cost':650,'Shipping Cost':0,'Coupon':'','Coupon Discount':0,'Product Name':'اسم المنتج',Variant:'',Quantity:1,SKU:'','Item Price':650,'Payment Method':'cod','Utm Source':'Facebook',Note:'','Order ID':''}]);
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'orders');XLSX.writeFile(wb,'orders_template.xlsx');
+  };
+
+  return <Modal show={true} onClose={onClose} title="📤 استيراد الأوردرات من Excel" size="md"
+    footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button>{step===2&&rows.length>0&&<button className="btn btn-primary" onClick={confirm} disabled={importing}>{importing?'⏳ جاري...':'✅ تأكيد الاستيراد ('+rows.length+')'}</button>}</>}>
+    {step===1?<>
+      <div className={drag?'upload-zone drag-over':'upload-zone'} onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);handleFile(e.dataTransfer.files[0])}} onClick={()=>ref.current.click()}>
+        <div style={{fontSize:36,marginBottom:12}}>📊</div>
+        <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginBottom:6}}>اسحب ملف Excel هنا أو اضغط</div>
+        <div style={{fontSize:12,color:'var(--text3)'}}>نفس فورمات الملف المُصدَّر من النظام</div>
+      </div>
+      <input ref={ref} type="file" accept=".xlsx,.csv" style={{display:'none'}} onChange={e=>handleFile(e.target.files[0])}/>
+      <div style={{marginTop:12,textAlign:'center'}}><button className="btn btn-ghost btn-sm" onClick={dlTemplate}>📥 تحميل قالب Excel</button></div>
+    </>:<>
+      <div style={{display:'flex',gap:12,marginBottom:14}}>
+        <div style={{flex:1,background:'var(--green-bg)',borderRadius:8,padding:12,textAlign:'center'}}><div style={{fontSize:22,fontWeight:800,color:'var(--green)'}}>{rows.length}</div><div style={{fontSize:11,color:'var(--text3)'}}>صف صالح</div></div>
+        <div style={{flex:1,background:'var(--red-bg)',borderRadius:8,padding:12,textAlign:'center'}}><div style={{fontSize:22,fontWeight:800,color:'var(--red)'}}>{errs.length}</div><div style={{fontSize:11,color:'var(--text3)'}}>أخطاء</div></div>
+      </div>
+      {errs.length>0&&<div style={{background:'var(--red-bg)',borderRadius:8,padding:10,marginBottom:12,maxHeight:100,overflowY:'auto'}}>{errs.map((e,i)=><div key={i} style={{fontSize:11,color:'var(--red)',marginBottom:3}}>⚠️ {e}</div>)}</div>}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:4}}>
+        <div className="form-group" style={{marginBottom:0}}>
+          <label className="form-label">ربط بأفيلييت</label>
+          <select className="input select" value={defAff} onChange={e=>setDefAff(e.target.value)}>
+            <option value="">اختياري</option>
+            {affs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </div>
+        <div className="form-group" style={{marginBottom:0}}>
+          <label className="form-label">توزيع على موظف كول سنتر</label>
+          <select className="input select" value={defCC} onChange={e=>setDefCC(e.target.value)}>
+            <option value="">اختياري — لا يُسند</option>
+            {ccUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        </div>
+      </div>
+      {defCC&&<div style={{background:'var(--blue-bg)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:11,color:'var(--blue)'}}>
+        ✅ سيتم توزيع جميع الأوردرات على <strong>{ccUsers.find(u=>u.id===defCC)?.name}</strong> وتغيير حالتها إلى "مسند"
+      </div>}
+      <div style={{maxHeight:240,overflowY:'auto'}}>
+        {rows.slice(0,15).map(r=><div key={r.id} style={{background:'var(--bg3)',borderRadius:8,padding:9,marginBottom:7}}>
+          <div style={{fontWeight:600,color:'var(--text)',fontSize:12}}>{r.order_ref} — {r.customer_name}</div>
+          <div style={{color:'var(--text3)',fontSize:11}}>{r.customer_phone} · {r.city} · {fmtMoney(r.total_cost)}</div>
+        </div>)}
+        {rows.length>15&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',padding:'8px 0'}}>... و {rows.length-15} أوردر آخر</div>}
+      </div>
+    </>}
+  </Modal>;
+};
+
+/* ═══════════════════════════════════
+   ADD ORDER MODAL
+═══════════════════════════════════ */
+const AddModal = ({user,affs,onClose}) => {
+  const [f,setF] = useState({order_ref:'ORD-'+Math.floor(Math.random()*90000+10000),customer_name:'',customer_phone:'',customer_alt_phone:'',city:'',customer_address:'',product_name:'',variant:'',sku:'',quantity:1,item_price:0,total_cost:0,product_cost:0,shipping_cost:0,discount:0,source:'',payment_method:'cod',affiliate_id:'',status:'new',note:''});
+  const [saving,setSaving] = useState(false);
+  const sf=(k,v)=>setF(x=>({...x,[k]:v}));
+
+  const save = async () => {
+    if(!f.customer_name.trim()){toast('اسم العميل مطلوب','error');return;}
+    setSaving(true);
+    const {error}=await sb.from('orders').insert({...f,id:uid(),affiliate_id:f.affiliate_id||null,assigned_to:null,created_at:now(),updated_at:now()});
+    if(error){toast('خطأ: '+error.message,'error');setSaving(false);return;}
+    toast('تم الإضافة ✅','success'); onClose();
+  };
+
+  return <Modal show={true} onClose={onClose} title="➕ إضافة أوردر" size="lg"
+    footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving?'⏳...':'💾 حفظ'}</button></>}>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+      <div className="form-group"><label className="form-label">رقم الأوردر</label><input className="input" value={f.order_ref} onChange={e=>sf('order_ref',e.target.value)}/></div>
+      <div className="form-group"><label className="form-label">الحالة</label>
+        <select className="input select" value={f.status} onChange={e=>sf('status',e.target.value)}>
+          {Object.entries(SL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+        </select>
+      </div>
+      <div className="form-group"><label className="form-label">اسم العميل *</label><input className="input" value={f.customer_name} onChange={e=>sf('customer_name',e.target.value)}/></div>
+      <div className="form-group"><label className="form-label">التليفون</label><input className="input" value={f.customer_phone} onChange={e=>sf('customer_phone',e.target.value)}/></div>
+      <div className="form-group"><label className="form-label">المحافظة</label><input className="input" value={f.city} onChange={e=>sf('city',e.target.value)}/></div>
+      <div className="form-group"><label className="form-label">تليفون بديل</label><input className="input" value={f.customer_alt_phone} onChange={e=>sf('customer_alt_phone',e.target.value)}/></div>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label className="form-label">العنوان</label><input className="input" value={f.customer_address} onChange={e=>sf('customer_address',e.target.value)}/></div>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label className="form-label">اسم المنتج</label><input className="input" value={f.product_name} onChange={e=>sf('product_name',e.target.value)}/></div>
+      <div className="form-group"><label className="form-label">الكمية</label><input className="input" type="number" value={f.quantity} onChange={e=>sf('quantity',parseInt(e.target.value)||1)}/></div>
+      <div className="form-group"><label className="form-label">سعر الوحدة</label><input className="input" type="number" value={f.item_price} onChange={e=>sf('item_price',parseFloat(e.target.value)||0)}/></div>
+      <div className="form-group"><label className="form-label">الإجمالي</label><input className="input" type="number" value={f.total_cost} onChange={e=>sf('total_cost',parseFloat(e.target.value)||0)}/></div>
+      <div className="form-group"><label className="form-label">خصم إضافي</label><input className="input" type="number" value={f.discount} onChange={e=>sf('discount',parseFloat(e.target.value)||0)}/></div>
+      <div className="form-group"><label className="form-label">الأفيلييت</label>
+        <select className="input select" value={f.affiliate_id} onChange={e=>sf('affiliate_id',e.target.value)}>
+          <option value="">بدون أفيلييت</option>
+          {affs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+      </div>
+      <div className="form-group"><label className="form-label">المصدر</label><input className="input" value={f.source} onChange={e=>sf('source',e.target.value)}/></div>
+      <div className="form-group" style={{gridColumn:'1/-1'}}><label className="form-label">ملاحظات</label><input className="input" value={f.note} onChange={e=>sf('note',e.target.value)}/></div>
+    </div>
+  </Modal>;
+};
+
+/* ═══════════════════════════════════
+   ASSIGN MODALS
+═══════════════════════════════════ */
+const AssignModal = ({order,ccUsers,user,onClose}) => {
+  const [sel,setSel] = useState('');
+  const go = async () => {
+    if(!sel){toast('اختر موظف','error');return;}
+    await sb.from('orders').update({assigned_to:sel,status:'assigned',updated_at:now()}).eq('id',order.id);
+    const u=ccUsers.find(u=>u.id===sel);
+    await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'توزيع أوردر',entity:'order',detail:`${order.order_ref} → ${u?.name}`,created_at:now()});
+    toast(`تم التوزيع على ${u?.name}`,'success'); onClose();
+  };
+  return <Modal show={true} onClose={onClose} title={`📋 توزيع ${order.order_ref}`} size="sm"
+    footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button><button className="btn btn-primary" onClick={go}>تأكيد</button></>}>
+    <div className="form-group"><label className="form-label">اختر موظف الكول سنتر</label>
+      <select className="input select" value={sel} onChange={e=>setSel(e.target.value)}><option value="">اختر...</option>{ccUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select>
+    </div>
+  </Modal>;
+};
+
+const BulkAssignModal = ({orderIds,ccUsers,user,onClose}) => {
+  const [sel,setSel] = useState('');
+  const [saving,setSaving] = useState(false);
+  const go = async () => {
+    if(!sel){toast('اختر موظف','error');return;}
+    setSaving(true);
+    await sb.from('orders').update({assigned_to:sel,status:'assigned',updated_at:now()}).in('id',orderIds);
+    const u=ccUsers.find(u=>u.id===sel);
+    await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'توزيع bulk',entity:'orders',detail:`${orderIds.length} أوردر → ${u?.name}`,created_at:now()});
+    toast(`تم توزيع ${orderIds.length} أوردر على ${u?.name}`,'success'); onClose();
+  };
+  return <Modal show={true} onClose={onClose} title={`📋 توزيع ${orderIds.length} أوردر`} size="sm"
+    footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button><button className="btn btn-primary" onClick={go} disabled={saving}>{saving?'⏳...':'تأكيد'}</button></>}>
+    <div style={{background:'var(--blue-bg)',borderRadius:8,padding:12,marginBottom:14,fontSize:12,color:'var(--blue)'}}>سيتم توزيع {orderIds.length} أوردر على الموظف المختار</div>
+    <div className="form-group"><label className="form-label">اختر موظف الكول سنتر</label>
+      <select className="input select" value={sel} onChange={e=>setSel(e.target.value)}><option value="">اختر...</option>{ccUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select>
+    </div>
+  </Modal>;
+};
+
+
+/* ═══════════════════════════════════
+   EXPORT CONFIRMED ORDERS TO EXCEL (Template Format)
+═══════════════════════════════════ */
+const exportConfirmedOrders = (orders, affiliates) => {
+  if(!orders||orders.length===0){toast('لا توجد أوردرات مؤكدة للتصدير','error');return;}
+  const days_ar = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const rows = orders.map((o,i) => {
+    const d = new Date(o.created_at||new Date());
+    const aff = affiliates.find(a=>a.id===o.affiliate_id);
+    // Parse products - support multiple if product_name has pipe separator or just use main product
+    const products = o.product_name ? o.product_name.split('|') : [o.product_name||''];
+    const qtys = o.quantity ? String(o.quantity).split('|') : ['1'];
+    const prices = o.item_price ? String(o.item_price).split('|') : [o.item_price||0];
+    const getP = (arr,idx) => arr[idx]||'';
+    return {
+      'رقم': i+1,
+      'اسم العميل': o.customer_name||'',
+      'المحمول': o.customer_phone||'',
+      'التليفون': o.customer_alt_phone||'',
+      'المحافظة': o.city||'',
+      'المنطقة': '',
+      '': o.city||'',
+      ' ': 0,
+      '  ': '',
+      'العنوان': o.customer_address||'',
+      'اليوم': days_ar[d.getDay()],
+      'التاريخ': d.getDate(),
+      'الشهر': d.getMonth()+1,
+      'السنة': d.getFullYear(),
+      'معاد التسليم': 'خلال يومين',
+      'منتج 1': getP(products,0),
+      'كمية 1': getP(qtys,0)||1,
+      'سعر1': getP(prices,0)||o.item_price||0,
+      'الشحن': o.shipping_cost||0,
+      'منتج 2': getP(products,1),
+      'كمية 2': getP(qtys,1),
+      'سعر 2': getP(prices,1),
+      'منتج 3': getP(products,2),
+      'كمية 3': getP(qtys,2),
+      'سعر 3 ': getP(prices,2),
+      'منتج 4': getP(products,3),
+      'كمية 4': getP(qtys,3),
+      'سعر 4': getP(prices,3),
+      'منتج 5': getP(products,4),
+      'كمية 5': getP(qtys,4),
+      'سعر 5': getP(prices,4),
+      'منتج 6': getP(products,5),
+      'كمية 6': getP(qtys,5),
+      'سعر 6': getP(prices,5),
+      'مروة': aff?aff.name:'',
+      'المندوب': '',
+      '   ': '',
+      'المدة': '',
+      'من': '',
+      'الى': '',
+      'ترويج 1': o.source||'',
+      'ترويج 2': o.utm_campaign||'',
+      'ترويج 3': o.note||'',
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows, {
+    header:['رقم','اسم العميل','المحمول','التليفون','المحافظة','المنطقة','','  ','   ','العنوان','اليوم','التاريخ','الشهر','السنة','معاد التسليم','منتج 1','كمية 1','سعر1','الشحن','منتج 2','كمية 2','سعر 2','منتج 3','كمية 3','سعر 3 ','منتج 4','كمية 4','سعر 4','منتج 5','كمية 5','سعر 5','منتج 6','كمية 6','سعر 6','مروة','المندوب',' ','المدة','من','الى','ترويج 1','ترويج 2','ترويج 3']
+  });
+
+  // Style: RTL, column widths
+  ws['!cols'] = [{wch:6},{wch:20},{wch:14},{wch:14},{wch:12},{wch:12},{wch:10},{wch:6},{wch:6},{wch:30},{wch:10},{wch:8},{wch:6},{wch:6},{wch:14},{wch:20},{wch:8},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:14},{wch:14},{wch:6},{wch:8},{wch:8},{wch:8},{wch:14},{wch:14},{wch:14}];
+  ws['!rtl'] = true;
+
+  const wb = XLSX.utils.book_new();
+  wb.Workbook = {Views:[{RTL:true}]};
+  XLSX.utils.book_append_sheet(wb, ws, 'التسجيل');
+
+  const date = new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'-');
+  XLSX.writeFile(wb, `confirmed_orders_${date}.xlsx`);
+  toast(`تم تصدير ${orders.length} أوردر ✅`, 'success');
+};
+
+/* ═══════════════════════════════════
+   SHIPPING PAGE
+═══════════════════════════════════ */
+const ShippingPage = ({user}) => {
+  const [orders,setOrders] = useState([]);
+  const [affs,setAffs] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [tab,setTab] = useState('confirmed');
+  const [search,setSearch] = useState('');
+  const [page,setPage] = useState(1);
+  const [sel,setSel] = useState([]);
+  const [printList,setPrint] = useState(null);
+
+  const load = useCallback(async()=>{
+    setLoading(true);
+    const [{data:o},{data:a}]=await Promise.all([
+      sb.from('orders').select('*').in('status',['confirmed','shipped','delivered','not_delivered']).order('created_at',{ascending:false}),
+      sb.from('affiliates').select('*'),
+    ]);
+    setOrders(o||[]); setAffs(a||[]); setLoading(false);
+  },[]);
+
+  useEffect(()=>{load();},[load]);
+
+  const filtered=orders.filter(o=>o.status===tab&&(!search||`${o.order_ref} ${o.customer_name} ${o.customer_phone} ${o.city}`.toLowerCase().includes(search.toLowerCase())));
+  const paged=filtered.slice((page-1)*PS,page*PS);
+  const acts={confirmed:['shipped'],shipped:['delivered','not_delivered'],delivered:[],not_delivered:['shipped']};
+
+  const doStatus=async(id,status)=>{
+    const o=orders.find(x=>x.id===id);
+    await sb.from('orders').update({status,updated_at:now()}).eq('id',id);
+    await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'تحديث شحن',entity:'order',detail:`${o?.order_ref}: → ${SL[status]}`,created_at:now()});
+    toast(`"${SL[status]}"`,'success'); load();
+  };
+
+  const tabs=[{k:'confirmed',l:'✅ مؤكدة',c:'green'},{k:'shipped',l:'🚚 في الشحن',c:'orange'},{k:'delivered',l:'🏆 مسلمة',c:'blue'},{k:'not_delivered',l:'❌ لم تُسلَّم',c:'red'}];
+
+  if(printList) return <PrintView orders={printList} affs={affs} onClose={()=>setPrint(null)}/>;
+
+  return <div className="page">
+    <div className="page-header">
+      <div><div className="page-title">قسم الشحن 🚚</div></div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        {tab==='confirmed'&&<button className="btn btn-success" onClick={()=>exportConfirmedOrders(orders.filter(o=>o.status==='confirmed'),affs)}>📥 تصدير Excel</button>}
+        {sel.length>0&&<button className="btn btn-ghost" onClick={()=>setPrint(orders.filter(o=>sel.includes(o.id)))}>🖨️ طباعة ({sel.length})</button>}
+      </div>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16}}>
+      {tabs.map(t=>{const count=orders.filter(o=>o.status===t.k).length;return(
+        <div key={t.k} className={`stat-card ${t.c}`} style={{cursor:'pointer',borderColor:tab===t.k?'var(--accent)':'',padding:'10px 8px'}} onClick={()=>{setTab(t.k);setPage(1);setSel([])}}>
+          <div style={{fontSize:10,color:'var(--text3)',marginBottom:4,fontWeight:600}}>{t.l}</div><div style={{fontSize:22,fontWeight:800,color:'var(--text)'}}>{count}</div>
+        </div>
+      );})}
+    </div>
+    <div className="table-wrap">
+      <div className="table-toolbar"><input className="input search-input" placeholder="🔍 بحث..." value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}}/></div>
+      {loading?<Loading/>:paged.length===0?<div className="empty-state"><div className="empty-icon">📭</div><div className="empty-title">لا توجد أوردرات</div></div>:<>
+        {/* DESKTOP TABLE */}
+        <div style={{overflowX:'auto'}}><table>
+          <thead><tr>
+            <th className="td-check"><input type="checkbox" checked={paged.length>0&&paged.every(o=>sel.includes(o.id))} onChange={()=>{const ids=paged.map(o=>o.id);setSel(ids.every(id=>sel.includes(id))?[]:ids)}}/></th>
+            <th>رقم الأوردر</th><th>العميل</th><th>المدينة</th><th>العنوان</th><th>المنتج</th><th>الأفيلييت</th><th>الإجمالي</th><th>إجراء</th>
+          </tr></thead>
+          <tbody>{paged.map(o=>{
+            const aff=affs.find(a=>a.id===o.affiliate_id);
+            const a2=acts[o.status]||[];
+            return <tr key={o.id} className={sel.includes(o.id)?'selected':''}>
+              <td className="td-check" onClick={e=>e.stopPropagation()}><input type="checkbox" checked={sel.includes(o.id)} onChange={()=>setSel(s=>s.includes(o.id)?s.filter(x=>x!==o.id):[...s,o.id])}/></td>
+              <td className="bold" style={{fontSize:11}}>{o.order_ref}</td>
+              <td><div style={{fontWeight:600,color:'var(--text)'}}>{o.customer_name}</div><div style={{fontSize:10,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div></td>
+              <td style={{fontSize:11}}>{o.city||'-'}</td>
+              <td style={{fontSize:11,color:'var(--text2)',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.customer_address||'-'}</td>
+              <td style={{fontSize:11,maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.product_name||'-'}</td>
+              <td>{aff?<span className="chip">{aff.name}</span>:'-'}</td>
+              <td style={{fontWeight:700,color:'var(--accent)'}}>{fmtMoney((o.total_cost||0)-(o.discount||0))}</td>
+              <td><div style={{display:'flex',gap:4}}>
+                <button className="btn btn-ghost btn-xs" onClick={()=>setPrint([o])}>🖨️</button>
+                {a2.map(s=><button key={s} className={`btn btn-sm ${s==='delivered'?'btn-success':s==='not_delivered'?'btn-danger':'btn-ghost'}`} onClick={()=>doStatus(o.id,s)}>{SL[s]}</button>)}
+              </div></td>
+            </tr>;
+          })}</tbody>
+        </table></div>
+        {/* MOBILE CARDS - Shipping */}
+        <div className="order-card" style={{padding:'8px 10px'}}>
+          {paged.map(o=>{
+            const aff=affs.find(a=>a.id===o.affiliate_id);
+            const a2=acts[o.status]||[];
+            const rawPhone=(o.customer_phone||'').replace(/\D/g,'');
+            const intlPhone=rawPhone.startsWith('0')?'2'+rawPhone:rawPhone;
+            const fp=(o.total_cost||0)-(o.discount||0);
+            return <div key={o.id} style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:12,padding:14,marginBottom:10}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                <input type="checkbox" checked={sel.includes(o.id)} onChange={()=>setSel(s=>s.includes(o.id)?s.filter(x=>x!==o.id):[...s,o.id])}/>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    <span style={{fontWeight:800,color:'var(--text)',fontSize:13}}>#{o.order_ref}</span>
+                    <SBadge status={o.status}/>
+                  </div>
+                  {aff&&<div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>🎯 {aff.name}</div>}
+                </div>
+                <div style={{fontWeight:800,color:'var(--accent)',fontSize:15}}>{fmtMoney(fp)}</div>
+              </div>
+              <div style={{background:'var(--bg2)',borderRadius:8,padding:'10px 12px',marginBottom:10}}>
+                <div style={{fontWeight:700,color:'var(--text)',fontSize:14,marginBottom:4}}>{o.customer_name}</div>
+                <div style={{fontSize:12,color:'var(--text2)',direction:'ltr',textAlign:'right',marginBottom:4}}>{o.customer_phone}</div>
+                {o.city&&<div style={{fontSize:11,color:'var(--text3)',marginBottom:2}}>📍 {o.city}</div>}
+                {o.customer_address&&<div style={{fontSize:11,color:'var(--text3)'}}>{o.customer_address.substring(0,60)}{o.customer_address.length>60?'...':''}</div>}
+              </div>
+              {o.product_name&&<div style={{fontSize:12,color:'var(--text2)',marginBottom:10}}>📦 {o.product_name} ×{o.quantity||1}</div>}
+              <div style={{display:'flex',gap:8,marginBottom:10}}>
+                <a href={`tel:${o.customer_phone}`} className="btn btn-success btn-sm" style={{flex:1,justifyContent:'center',textDecoration:'none'}}>📞 اتصال</a>
+                <a href={`https://wa.me/${intlPhone}?text=${encodeURIComponent('مرحباً '+o.customer_name+'، بخصوص طلبكم رقم '+o.order_ref)}`} target="_blank" rel="noreferrer" className="btn btn-sm" style={{flex:1,justifyContent:'center',background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
+                <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={()=>setPrint([o])}>🖨️</button>
+              </div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {a2.map(s=><button key={s} className={`btn btn-sm ${s==='delivered'?'btn-success':s==='not_delivered'?'btn-danger':'btn-ghost'}`} style={{flex:1,justifyContent:'center'}} onClick={()=>doStatus(o.id,s)}>{SL[s]}</button>)}
+              </div>
+            </div>;
+          })}
+        </div>
+        <Pager total={filtered.length} page={page} setPage={setPage}/>
+      </>}
+    </div>
+    {sel.length>0&&<div className="bulk-bar">
+      <span className="bulk-count">{sel.length} محدد</span>
+      <div className="bulk-actions"><button className="btn btn-ghost btn-sm" onClick={()=>setPrint(orders.filter(o=>sel.includes(o.id)))}>🖨️ طباعة</button><button className="btn btn-ghost btn-sm" onClick={()=>setSel([])}>✕</button></div>
+    </div>}
+  </div>;
+};
+
+/* ═══════════════════════════════════
+   AFFILIATES PAGE
+═══════════════════════════════════ */
+const AffsPage = ({user}) => {
+  const [affs,setAffs] = useState([]);
+  const [stats,setStats] = useState({});
+  const [loading,setLoading] = useState(true);
+  const [showAdd,setShowAdd] = useState(false);
+  const [detail,setDetail] = useState(null);
+
+  const load = useCallback(async()=>{
+    setLoading(true);
+    const [{data:af},{data:or},{data:co}]=await Promise.all([
+      sb.from('affiliates').select('*').order('name'),
+      sb.from('orders').select('affiliate_id,status,total_cost,discount'),
+      sb.from('commissions').select('affiliate_id,amount,is_paid'),
+    ]);
+    setAffs(af||[]);
+    const s={};
+    (af||[]).forEach(a=>{
+      const ao=(or||[]).filter(o=>o.affiliate_id===a.id);
+      const ac=(co||[]).filter(c=>c.affiliate_id===a.id);
+      s[a.id]={total:ao.length,delivered:ao.filter(o=>o.status==='delivered').length,shipped:ao.filter(o=>o.status==='shipped').length,cancelled:ao.filter(o=>o.status==='cancelled').length,confirmed:ao.filter(o=>o.status==='confirmed').length,total_c:ac.reduce((t,c)=>t+c.amount,0),pending:ac.filter(c=>!c.is_paid).reduce((t,c)=>t+c.amount,0)};
+    });
+    setStats(s); setLoading(false);
+  },[]);
+
+  useEffect(()=>{load();},[load]);
+
+  const addAff = async f => {
+    const {error}=await sb.from('affiliates').insert({id:uid(),...f});
+    if(error){toast('خطأ','error');return;}
+    toast('تم الإضافة ✅','success'); setShowAdd(false); load();
+  };
+
+  if(loading) return <div className="page"><div className="loading-screen" style={{background:'transparent'}}><Spin/></div></div>;
+
+  return <div className="page">
+    <div className="page-header"><div><div className="page-title">الأفيليتس 🎯</div><div className="page-sub">{affs.length} أفيلييت</div></div>
+      {user.role==='admin'&&<button className="btn btn-primary" onClick={()=>setShowAdd(true)}>➕ إضافة</button>}
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>
+      {affs.map(aff=>{const s=stats[aff.id]||{};return(
+        <div key={aff.id} className="affiliate-card" onClick={()=>setDetail(aff)}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
+            <div style={{width:40,height:40,borderRadius:10,background:'var(--accent)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:800,color:'#fff'}}>{aff.name.charAt(0)}</div>
+            <div><div style={{fontSize:14,fontWeight:700,color:'var(--text)'}}>{aff.name}</div><div style={{fontSize:11,color:'var(--text3)'}}>{aff.phone}</div></div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+            {[{l:'إجمالي',v:s.total||0,bg:'var(--bg3)',c:'var(--text)'},{l:'مسلم',v:s.delivered||0,bg:'var(--green-bg)',c:'var(--green)'},{l:'شحن',v:s.shipped||0,bg:'var(--orange-bg)',c:'var(--orange)'},{l:'ملغي',v:s.cancelled||0,bg:'var(--red-bg)',c:'var(--red)'}].map(x=>(
+              <div key={x.l} style={{background:x.bg,borderRadius:8,padding:10,textAlign:'center'}}><div style={{fontSize:18,fontWeight:800,color:x.c}}>{x.v}</div><div style={{fontSize:10,color:'var(--text3)'}}>{x.l}</div></div>
+            ))}
+          </div>
+          <div className="divider" style={{margin:'12px 0'}}/>
+          <div style={{display:'flex',justifyContent:'space-between'}}>
+            <div><div style={{fontSize:10,color:'var(--text3)'}}>إجمالي العمولات</div><div style={{fontSize:15,fontWeight:700,color:'var(--green)'}}>{fmtMoney(s.total_c||0)}</div></div>
+            <div style={{textAlign:'left'}}><div style={{fontSize:10,color:'var(--text3)'}}>معلق</div><div style={{fontSize:13,fontWeight:700,color:'var(--yellow)'}}>{fmtMoney(s.pending||0)}</div></div>
+          </div>
+        </div>
+      );})}
+    </div>
+    {showAdd&&<Modal show={true} onClose={()=>setShowAdd(false)} title="➕ إضافة أفيلييت" size="sm"
+      footer={<><button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>إلغاء</button><button className="btn btn-primary" id="saff_btn">حفظ</button></>}>
+      {(()=>{
+        let fn={name:'',phone:'',email:''};
+        return <>
+          <div className="form-group"><label className="form-label">الاسم *</label><input className="input" id="aff_n" onChange={e=>fn.name=e.target.value}/></div>
+          <div className="form-group"><label className="form-label">التليفون</label><input className="input" id="aff_p" onChange={e=>fn.phone=e.target.value}/></div>
+          <div className="form-group"><label className="form-label">الإيميل</label><input className="input" id="aff_e" type="email" onChange={e=>fn.email=e.target.value}/></div>
+          <script dangerouslySetInnerHTML={{__html:`document.getElementById('saff_btn').onclick=()=>{if(!document.getElementById('aff_n').value){return;}}`}}/>
+        </>;
+      })()}
+    </Modal>}
+    {/* Better add modal */}
+    {showAdd&&<AffAddModal onClose={()=>setShowAdd(false)} onSave={addAff}/>}
+    {detail&&<AffDetailModal aff={detail} user={user} onClose={()=>{setDetail(null);load();}}/>}
+  </div>;
+};
+
+const AffAddModal = ({onClose,onSave}) => {
+  const [f,setF] = useState({name:'',phone:'',email:''});
+  return <Modal show={true} onClose={onClose} title="➕ إضافة أفيلييت" size="sm"
+    footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button><button className="btn btn-primary" onClick={()=>{if(!f.name.trim()){toast('الاسم مطلوب','error');return;}onSave(f);}}>حفظ</button></>}>
+    <div className="form-group"><label className="form-label">الاسم *</label><input className="input" value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
+    <div className="form-group"><label className="form-label">التليفون</label><input className="input" value={f.phone} onChange={e=>setF(x=>({...x,phone:e.target.value}))}/></div>
+    <div className="form-group"><label className="form-label">الإيميل</label><input className="input" type="email" value={f.email} onChange={e=>setF(x=>({...x,email:e.target.value}))}/></div>
+  </Modal>;
+};
+
+const AffDetailModal = ({aff,user,onClose}) => {
+  const [orders,setOrders] = useState([]);
+  const [comms,setComms] = useState([]);
+  const [addComm,setAddComm] = useState(null);
+  const [loading,setLoading] = useState(true);
+
+  useEffect(()=>{
+    (async()=>{
+      const [{data:o},{data:c}]=await Promise.all([
+        sb.from('orders').select('*').eq('affiliate_id',aff.id).order('created_at',{ascending:false}),
+        sb.from('commissions').select('*').eq('affiliate_id',aff.id),
+      ]);
+      setOrders(o||[]); setComms(c||[]); setLoading(false);
+    })();
+  },[aff.id]);
+
+  const noComm=orders.filter(o=>o.status==='delivered'&&!comms.find(c=>c.order_id===o.id));
+  const tc=comms.reduce((t,c)=>t+c.amount,0);
+  const pc=comms.filter(c=>!c.is_paid).reduce((t,c)=>t+c.amount,0);
+
+  const saveComm=async(ordId,amt)=>{
+    const {error}=await sb.from('commissions').insert({id:uid(),order_id:ordId,affiliate_id:aff.id,amount:parseFloat(amt),is_paid:false,paid_at:null,paid_by:null,payment_batch:null,created_at:now()});
+    if(error){toast('خطأ','error');return;}
+    toast('تم إضافة العمولة ✅','success'); setAddComm(null);
+    const {data:c}=await sb.from('commissions').select('*').eq('affiliate_id',aff.id);
+    setComms(c||[]);
+  };
+
+  return <Modal show={true} onClose={onClose} title={`🎯 ${aff.name}`} size="lg">
+    {loading?<Loading/>:<>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+        <div style={{background:'var(--green-bg)',borderRadius:8,padding:12}}><div style={{fontSize:10,color:'var(--text3)',marginBottom:4}}>إجمالي العمولات</div><div style={{fontSize:20,fontWeight:800,color:'var(--green)'}}>{fmtMoney(tc)}</div></div>
+        <div style={{background:'var(--yellow-bg)',borderRadius:8,padding:12}}><div style={{fontSize:10,color:'var(--text3)',marginBottom:4}}>عمولات معلقة</div><div style={{fontSize:20,fontWeight:800,color:'var(--yellow)'}}>{fmtMoney(pc)}</div></div>
+      </div>
+      {user.role==='admin'&&noComm.length>0&&<>
+        <div style={{fontSize:12,fontWeight:700,color:'var(--text)',marginBottom:10}}>➕ أوردرات مسلمة بدون عمولة ({noComm.length})</div>
+        {noComm.map(o=><div key={o.id} style={{display:'flex',alignItems:'center',gap:10,background:'var(--bg3)',borderRadius:8,padding:10,marginBottom:8}}>
+          <div style={{flex:1}}><div style={{fontSize:12,fontWeight:600,color:'var(--text)'}}>{o.order_ref}</div><div style={{fontSize:10,color:'var(--text3)'}}>{o.product_name} · {fmtMoney(o.total_cost)}</div></div>
+          {addComm===o.id?<CommInp onSave={v=>saveComm(o.id,v)} onCancel={()=>setAddComm(null)}/>:<button className="btn btn-success btn-xs" onClick={()=>setAddComm(o.id)}>+ عمولة</button>}
+        </div>)}
+        <div className="divider"/>
+      </>}
+      <div style={{fontSize:12,fontWeight:700,color:'var(--text)',marginBottom:10}}>سجل العمولات</div>
+      {comms.length===0?<div style={{fontSize:12,color:'var(--text3)',textAlign:'center',padding:'20px 0'}}>لا توجد عمولات</div>:comms.map(c=>{
+        const o=orders.find(x=>x.id===c.order_id);
+        return <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,background:'var(--bg3)',borderRadius:8,padding:10,marginBottom:8}}>
+          <div style={{flex:1}}><div style={{fontSize:12,fontWeight:600,color:'var(--text)'}}>{o?.order_ref||'-'} — {fmtMoney(c.amount)}</div><div style={{fontSize:10,color:'var(--text3)'}}>{c.is_paid?`مدفوع ${fmtDate(c.paid_at)}`:'معلق'}</div></div>
+          <span className={`badge ${c.is_paid?'badge-paid':'badge-unpaid'}`}>{c.is_paid?'مدفوع':'معلق'}</span>
+        </div>;
+      })}
+    </>}
+  </Modal>;
+};
+
+const CommInp = ({onSave,onCancel}) => {
+  const [v,setV]=useState('');
+  return <div style={{display:'flex',gap:6}}>
+    <input className="input" style={{width:80,padding:'4px 8px',fontSize:12}} placeholder="مبلغ" value={v} onChange={e=>setV(e.target.value)} type="number"/>
+    <button className="btn btn-success btn-xs" onClick={()=>onSave(v)}>✓</button>
+    <button className="btn btn-ghost btn-xs" onClick={onCancel}>✕</button>
+  </div>;
+};
+
+/* ═══════════════════════════════════
+   COMMISSIONS PAGE
+═══════════════════════════════════ */
+const CommsPage = ({user}) => {
+  const [comms,setComms] = useState([]);
+  const [orders,setOrders] = useState([]);
+  const [affs,setAffs] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [fp,setFp] = useState('');
+  const [fa,setFa] = useState('');
+  const [sel,setSel] = useState([]);
+  const [page,setPage] = useState(1);
+  const [showPay,setShowPay] = useState(false);
+
+  const load=useCallback(async()=>{
+    setLoading(true);
+    const [{data:c},{data:o},{data:a}]=await Promise.all([
+      sb.from('commissions').select('*').order('created_at',{ascending:false}),
+      sb.from('orders').select('id,order_ref'),
+      sb.from('affiliates').select('*'),
+    ]);
+    setComms(c||[]); setOrders(o||[]); setAffs(a||[]); setLoading(false);
+  },[]);
+
+  useEffect(()=>{load();},[load]);
+
+  const filtered=comms.filter(c=>{
+    if(fp==='paid'&&!c.is_paid) return false;
+    if(fp==='unpaid'&&c.is_paid) return false;
+    if(fa&&c.affiliate_id!==fa) return false;
+    return true;
+  });
+  const paged=filtered.slice((page-1)*PS,page*PS);
+  const unpaid=comms.filter(c=>!c.is_paid);
+  const selTotal=comms.filter(c=>sel.includes(c.id)).reduce((t,c)=>t+c.amount,0);
+
+  const bulkPay=async note=>{
+    const bid=uid();
+    await sb.from('commissions').update({is_paid:true,paid_at:now(),paid_by:user.id,payment_batch:bid}).in('id',sel);
+    await sb.from('payment_batches').insert({id:bid,paid_by:user.id,paid_at:now(),note,total_amount:selTotal});
+    await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'دفع عمولات bulk',entity:'commission',detail:`دفع ${sel.length} عمولة — ${fmtMoney(selTotal)}`,created_at:now()});
+    toast(`تم دفع ${sel.length} عمولة ✅`,'success');
+    setSel([]); setShowPay(false); load();
+  };
+
+  return <div className="page">
+    <div className="page-header">
+      <div><div className="page-title">العمولات 💰</div><div className="page-sub">{unpaid.length} معلقة — {fmtMoney(unpaid.reduce((t,c)=>t+c.amount,0))}</div></div>
+      {sel.length>0&&<button className="btn btn-success" onClick={()=>setShowPay(true)}>💸 دفع {sel.length} عمولة</button>}
+    </div>
+    <div className="table-wrap">
+      <div className="table-toolbar">
+        <select className="input select" style={{width:130}} value={fp} onChange={e=>{setFp(e.target.value);setPage(1)}}><option value="">الكل</option><option value="unpaid">معلقة</option><option value="paid">مدفوعة</option></select>
+        <select className="input select" style={{width:150}} value={fa} onChange={e=>{setFa(e.target.value);setPage(1)}}><option value="">كل الأفيليتس</option>{affs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>
+      </div>
+      {loading?<Loading/>:paged.length===0?<div className="empty-state"><div className="empty-icon">💰</div><div className="empty-title">لا توجد عمولات</div></div>:<>
+        <table><thead><tr>
+          <th className="td-check"><input type="checkbox" checked={paged.filter(c=>!c.is_paid).length>0&&paged.filter(c=>!c.is_paid).every(c=>sel.includes(c.id))} onChange={()=>{const ids=paged.filter(c=>!c.is_paid).map(c=>c.id);setSel(ids.every(id=>sel.includes(id))?sel.filter(id=>!ids.includes(id)):[...new Set([...sel,...ids])])}}/></th>
+          <th>الأوردر</th><th>الأفيلييت</th><th>المبلغ</th><th>الحالة</th><th>تاريخ الدفع</th>
+        </tr></thead>
+        <tbody>{paged.map(c=>{
+          const o=orders.find(x=>x.id===c.order_id); const aff=affs.find(a=>a.id===c.affiliate_id);
+          return <tr key={c.id} className={sel.includes(c.id)?'selected':''}>
+            <td className="td-check">{!c.is_paid&&<input type="checkbox" checked={sel.includes(c.id)} onChange={()=>setSel(s=>s.includes(c.id)?s.filter(x=>x!==c.id):[...s,c.id])}/>}</td>
+            <td className="bold">{o?.order_ref||'-'}</td>
+            <td>{aff?.name||'-'}</td>
+            <td style={{fontWeight:700,color:'var(--green)',fontSize:14}}>{fmtMoney(c.amount)}</td>
+            <td><span className={`badge ${c.is_paid?'badge-paid':'badge-unpaid'}`}>{c.is_paid?'مدفوع':'معلق'}</span></td>
+            <td style={{fontSize:11,color:'var(--text3)'}}>{c.is_paid?fmtDate(c.paid_at):'-'}</td>
+          </tr>;
+        })}</tbody></table>
+        <Pager total={filtered.length} page={page} setPage={setPage}/>
+      </>}
+    </div>
+    {sel.length>0&&<div className="bulk-bar">
+      <span className="bulk-count">{sel.length} محدد — {fmtMoney(selTotal)}</span>
+      <div className="bulk-actions"><button className="btn btn-success btn-sm" onClick={()=>setShowPay(true)}>💸 دفع</button><button className="btn btn-ghost btn-sm" onClick={()=>setSel([])}>✕</button></div>
+    </div>}
+    {showPay&&<PayModal onClose={()=>setShowPay(false)} onConfirm={bulkPay} count={sel.length} total={selTotal}/>}
+  </div>;
+};
+
+const PayModal = ({onClose,onConfirm,count,total}) => {
+  const [note,setNote]=useState('');
+  return <Modal show={true} onClose={onClose} title="💸 تأكيد الدفع" size="sm"
+    footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button><button className="btn btn-success" onClick={()=>onConfirm(note)}>تأكيد الدفع</button></>}>
+    <div style={{background:'var(--green-bg)',borderRadius:10,padding:16,textAlign:'center',marginBottom:16}}>
+      <div style={{fontSize:28,fontWeight:800,color:'var(--green)'}}>{fmtMoney(total)}</div>
+      <div style={{fontSize:12,color:'var(--text3)'}}>{count} عمولة</div>
+    </div>
+    <div className="form-group"><label className="form-label">ملاحظة</label><input className="input" placeholder="مثال: دفعة أبريل 2026" value={note} onChange={e=>setNote(e.target.value)}/></div>
+    <div style={{fontSize:11,color:'var(--yellow)',background:'var(--yellow-bg)',borderRadius:8,padding:10}}>⚠️ لا يمكن التراجع عن هذا الإجراء</div>
+  </Modal>;
+};
+
+/* ═══════════════════════════════════
+   USERS PAGE
+═══════════════════════════════════ */
+const UsersPage = ({user}) => {
+  const [users,setUsers] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [showAdd,setShowAdd] = useState(false);
+
+  const load=async()=>{setLoading(true);const{data}=await sb.from('users').select('*').order('name');setUsers(data||[]);setLoading(false);};
+  useEffect(()=>{load();},[]);
+
+  const toggle=async id=>{
+    if(id===user.id){toast('لا يمكن تعطيل حسابك','error');return;}
+    const u=users.find(x=>x.id===id);
+    await sb.from('users').update({active:!u.active}).eq('id',id);
+    toast('تم التحديث','success'); load();
+  };
+
+  const addUser=async f=>{
+    if(users.find(u=>u.email===f.email)){toast('الإيميل مستخدم','error');return;}
+    await sb.from('users').insert({id:uid(),...f,avatar_color:'#4f6ef7',active:true});
+    toast('تم الإضافة ✅','success'); setShowAdd(false); load();
+  };
+
+  const rc={admin:'var(--accent)',call_center:'var(--purple)',shipping:'var(--orange)'};
+  return <div className="page">
+    <div className="page-header"><div><div className="page-title">المستخدمون 👥</div></div><button className="btn btn-primary" onClick={()=>setShowAdd(true)}>➕ إضافة</button></div>
+    <div className="table-wrap">
+      {loading?<Loading/>:<table>
+        <thead><tr><th>الاسم</th><th>الإيميل</th><th>الدور</th><th>الحالة</th><th>إجراء</th></tr></thead>
+        <tbody>{users.map(u=><tr key={u.id}>
+          <td><div style={{display:'flex',alignItems:'center',gap:10}}><div className="user-avatar" style={{background:u.avatar_color||'var(--accent)'}}>{u.name.charAt(0)}</div><span style={{fontWeight:600,color:'var(--text)'}}>{u.name}</span></div></td>
+          <td style={{fontSize:12,color:'var(--text3)'}}>{u.email}</td>
+          <td><span className="badge" style={{background:`${rc[u.role]}20`,color:rc[u.role]}}>{RL[u.role]}</span></td>
+          <td><span className={`badge ${u.active?'badge-confirmed':'badge-cancelled'}`}>{u.active?'نشط':'معطل'}</span></td>
+          <td><button className={`btn btn-sm ${u.active?'btn-danger':'btn-success'}`} onClick={()=>toggle(u.id)}>{u.active?'تعطيل':'تفعيل'}</button></td>
+        </tr>)}</tbody>
+      </table>}
+    </div>
+    {showAdd&&<UserAddModal onClose={()=>setShowAdd(false)} onSave={addUser}/>}
+  </div>;
+};
+
+const UserAddModal = ({onClose,onSave}) => {
+  const [f,setF]=useState({name:'',email:'',password:'123456',role:'call_center'});
+  return <Modal show={true} onClose={onClose} title="➕ إضافة مستخدم" size="sm"
+    footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button><button className="btn btn-primary" onClick={()=>{if(!f.name||!f.email){toast('كل الحقول مطلوبة','error');return;}onSave(f);}}>حفظ</button></>}>
+    <div className="form-group"><label className="form-label">الاسم *</label><input className="input" value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></div>
+    <div className="form-group"><label className="form-label">الإيميل *</label><input className="input" type="email" value={f.email} onChange={e=>setF(x=>({...x,email:e.target.value}))}/></div>
+    <div className="form-group"><label className="form-label">كلمة المرور</label><input className="input" value={f.password} onChange={e=>setF(x=>({...x,password:e.target.value}))}/></div>
+    <div className="form-group"><label className="form-label">الدور</label>
+      <select className="input select" value={f.role} onChange={e=>setF(x=>({...x,role:e.target.value}))}>
+        <option value="call_center">كول سنتر</option><option value="shipping">شحن</option><option value="admin">أدمن</option>
+      </select>
+    </div>
+  </Modal>;
+};
+
+/* ═══════════════════════════════════
+   AUDIT PAGE
+═══════════════════════════════════ */
+const AuditPage = () => {
+  const [logs,setLogs]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [page,setPage]=useState(1);
+  useEffect(()=>{sb.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(500).then(({data})=>{setLogs(data||[]);setLoading(false);});},[]);
+  const paged=logs.slice((page-1)*PS,page*PS);
+  const colors=['var(--accent)','var(--green)','var(--orange)','var(--purple)','var(--red)','var(--blue)'];
+  return <div className="page">
+    <div className="page-header"><div><div className="page-title">سجل النشاطات 📝</div><div className="page-sub">{logs.length} إجراء</div></div></div>
+    <div className="table-wrap" style={{padding:20}}>
+      {loading?<Loading/>:paged.map((log,i)=><div key={log.id} className="log-item">
+        <div className="log-dot" style={{background:colors[i%colors.length]}}/>
+        <div style={{flex:1}}><div style={{fontSize:12,color:'var(--text)',fontWeight:500}}>{log.action}</div><div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>{log.detail}</div></div>
+        <div style={{textAlign:'left'}}><div style={{fontSize:11,fontWeight:600,color:'var(--text2)'}}>{log.user_name}</div><div style={{fontSize:10,color:'var(--text3)'}}>{fmtDate(log.created_at)}</div></div>
+      </div>)}
+    </div>
+    <Pager total={logs.length} page={page} setPage={setPage}/>
+  </div>;
+};
+
+/* ═══════════════════════════════════
+   APP SHELL
+═══════════════════════════════════ */
+const NAV={
+  admin:[{id:'dashboard',icon:'📊',label:'لوحة التحكم'},{id:'orders',icon:'📋',label:'الأوردرات'},{id:'shipping',icon:'🚚',label:'قسم الشحن'},{id:'affiliates',icon:'🎯',label:'الأفيليتس'},{id:'commissions',icon:'💰',label:'العمولات'},{id:'users',icon:'👥',label:'المستخدمون'},{id:'audit',icon:'📝',label:'سجل النشاطات'}],
+  call_center:[{id:'orders',icon:'📋',label:'أوردراتي'}],
+  shipping:[{id:'shipping',icon:'🚚',label:'قسم الشحن'}],
+};
+
+const Shell = ({user,onLogout}) => {
+  const [page,setPage]=useState(user.role==='call_center'?'orders':user.role==='shipping'?'shipping':'dashboard');
+  const [badges,setBadges]=useState({});
+  const [sideOpen,setSideOpen]=useState(false);
+  const nav=NAV[user.role]||[];
+  const closeSide=()=>setSideOpen(false);
+
+  useEffect(()=>{
+    (async()=>{
+      const [{data:o},{data:c}]=await Promise.all([
+        sb.from('orders').select('status,assigned_to'),
+        sb.from('commissions').select('is_paid'),
+      ]);
+      const ords=o||[];
+      setBadges({
+        orders:user.role==='admin'?ords.filter(x=>['new','pending'].includes(x.status)).length:ords.filter(x=>x.assigned_to===user.id&&!['confirmed','cancelled','delivered'].includes(x.status)).length,
+        shipping:ords.filter(x=>x.status==='confirmed').length,
+        commissions:(c||[]).filter(x=>!x.is_paid).length,
+      });
+    })();
+  },[page,user]);
+
+  const pages={dashboard:<Dashboard user={user}/>,orders:<OrdersPage user={user}/>,shipping:<ShippingPage user={user}/>,affiliates:<AffsPage user={user}/>,commissions:<CommsPage user={user}/>,users:<UsersPage user={user}/>,audit:<AuditPage/>};
+  const titles={dashboard:'لوحة التحكم',orders:'الأوردرات',shipping:'قسم الشحن',affiliates:'الأفيليتس',commissions:'العمولات',users:'المستخدمون',audit:'سجل النشاطات'};
+  const rc={admin:'var(--accent)',call_center:'var(--purple)',shipping:'var(--orange)'};
+
+  return <div className="app-layout">
+    <div className={`overlay ${sideOpen?'open':''}`} onClick={closeSide}/>
+    <aside className={`sidebar ${sideOpen?'open':''}`}>
+      <div className="sidebar-logo"><div className="logo-icon">🏪</div><div><div className="logo-text">Dark Store CRM</div><div className="logo-sub">نظام إدارة الأوردرات</div></div></div>
+      <div className="sidebar-section">
+        {nav.map(item=>{const b=badges[item.id]||0;return(
+          <div key={item.id} className={`nav-item ${page===item.id?'active':''}`} onClick={()=>{setPage(item.id);closeSide();}}>
+            <span className="nav-icon">{item.icon}</span>{item.label}
+            {b>0&&<span className="nav-badge">{b}</span>}
+          </div>
+        );})}
+      </div>
+      <div className="sidebar-user">
+        <div className="user-avatar" style={{background:user.avatar_color||rc[user.role]}}>{user.name.charAt(0)}</div>
+        <div style={{flex:1,minWidth:0}}><div className="user-name">{user.name}</div><div className="user-role">{RL[user.role]}</div></div>
+        <button className="close-btn" onClick={onLogout} title="خروج">🚪</button>
+      </div>
+    </aside>
+    <main className="main-content">
+      <div className="topbar">
+        <button className="menu-btn" onClick={()=>setSideOpen(s=>!s)}>☰</button>
+        <div className="topbar-title">{titles[page]}</div>
+        <span style={{fontSize:11,color:'var(--text3)'}}>مرحباً، <span style={{color:'var(--text2)',fontWeight:600}}>{user.name}</span></span>
+        <span className="badge" style={{background:`${rc[user.role]}20`,color:rc[user.role]}}>{RL[user.role]}</span>
+      </div>
+      {pages[page]}
+    </main>
+  </div>;
+};
+
+/* ═══════════════════════════════════
+   MAIN APP
+═══════════════════════════════════ */
+const App = () => {
+  const [user,setUser]=useState(null);
+  const [checking,setChecking]=useState(true);
+
+  useEffect(()=>{
+    try{const s=sessionStorage.getItem('crm_u');if(s)setUser(JSON.parse(s));}catch{}
+    setChecking(false);
+  },[]);
+
+  const login=u=>{sessionStorage.setItem('crm_u',JSON.stringify(u));setUser(u);};
+  const logout=()=>{sessionStorage.removeItem('crm_u');setUser(null);};
+
+  if(checking) return <div className="loading-screen"><Spin/><span style={{color:'var(--text3)'}}>جاري التحميل...</span></div>;
+  if(!user) return <Login onLogin={login}/>;
+  return <><Shell user={user} onLogout={logout}/><ToastBox/></>;
+};
+
+ReactDOM.render(<App/>,document.getElementById('root'));
+</script>
+</body>
+</html>
