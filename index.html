@@ -249,6 +249,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
+const APP_VERSION = '2026.10.14-history-admin';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = sessionStorage.getItem('crm_t')||'';
@@ -354,6 +355,118 @@ const DupBadge = ({d,full}) => {
   const tip=`مكرر مع أوردر ${d.first.ref} — ${w.full}`;
   if(full) return <div title={tip} style={{marginTop:6,fontSize:11,fontWeight:700,color:'var(--orange)',background:'var(--orange-bg)',border:'1px solid var(--orange)',borderRadius:8,padding:'5px 9px'}}>🔁 مكرر مع #{d.first.ref} — {w.full}{more}</div>;
   return <div title={tip} style={{marginTop:3,fontSize:9,fontWeight:700,color:'var(--orange)',whiteSpace:'nowrap'}}>🔁 مكرر · {w.rel}{more}</div>;
+};
+/* ═══ تاريخ حياة الأوردر + تتبع الاتصال والواتساب + إحصائيات اليوم ═══ */
+const FIELD_LABELS = {customer_name:'الاسم',customer_phone:'الموبايل',customer_alt_phone:'التليفون البديل',city:'المحافظة',customer_address:'العنوان',product_name:'المنتج',variant:'النوع',sku:'SKU',quantity:'الكمية',item_price:'سعر الوحدة',total_cost:'الإجمالي',product_cost:'تكلفة المنتج',shipping_cost:'الشحن',coupon:'الكوبون',coupon_discount:'خصم الكوبون',discount:'الخصم',source:'المصدر',utm_campaign:'الحملة',payment_method:'طريقة الدفع',note:'الملاحظة',referral_code:'كود الإحالة',affiliate_id:'الأفيليت',external_id:'الرقم الخارجي',order_ref:'رقم الأوردر'};
+const logContact = (orderId,type,user,extra) => { sb.from('order_events').insert({order_id:orderId,type,user_id:user.id,user_name:user.name,...(extra?{changes:extra}:{})}).then(()=>{},()=>{}); };
+
+const ContactSummary = ({events}) => {
+  if(events===null) return null;
+  if(events===false) return <div style={{fontSize:10,color:'var(--text3)',margin:'-6px 0 12px'}}>تتبع الاتصال والواتساب غير مفعّل بعد (شغّل history-migration.sql)</div>;
+  const part=(icon,label,type)=>{
+    const l=events.filter(e=>e.type===type);
+    if(!l.length) return <span className="chip" style={{fontSize:10,color:'var(--text3)'}}>{icon} {label}: لم يتم الضغط</span>;
+    const last=l[l.length-1];
+    return <span className="chip" style={{fontSize:10,color:'var(--green)',borderColor:'var(--green)'}}>{icon} {label}: {l.length} مرة — آخر مرة {fmtDate(last.created_at)}{last.user_name?` (${last.user_name})`:''}</span>;
+  };
+  return <div style={{display:'flex',gap:6,flexWrap:'wrap',margin:'-6px 0 12px'}}>{part('📞','الاتصال','call')}{part('💬','الواتساب','whatsapp')}</div>;
+};
+
+const OrderTimeline = ({order,events,users,affs}) => {
+  const nameU = id => id?(users.find(u=>u.id===id)?.name||id):'—';
+  const fv = (k,v) => { if(v===null||v===undefined||v==='') return '—'; if(k==='affiliate_id') return affs.find(a=>a.id===v)?.name||String(v); const t=String(v); return t.length>50?t.slice(0,50)+'…':t; };
+  const list = Array.isArray(events)?events:[];
+  const createdEv = list.find(e=>e.type==='created');
+  const sep = createdEv&&Math.abs(new Date(createdEv.created_at)-new Date(order.created_at))>120000;
+  const by = u => u?<span style={{color:'var(--text3)'}}> — بواسطة {u}</span>:null;
+  const rows = [{k:'origin',at:order.created_at,icon:'🆕',color:'var(--blue)',user:null,body:<><b>الأوردر اتعمل</b>{!sep&&createdEv&&by(createdEv.user_name)}</>}];
+  if(sep) rows.push({k:'created',at:createdEv.created_at,icon:'📥',color:'var(--blue)',user:null,body:<><b>اتضاف للسيستم</b>{by(createdEv.user_name)}</>});
+  list.forEach(e=>{
+    if(e.type==='created'||e.type==='call'||e.type==='whatsapp') return;
+    if(e.type==='status') rows.push({k:e.id,at:e.created_at,icon:'🔄',color:'var(--orange)',user:e.user_name,body:<span style={{display:'inline-flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><b>غيّر الحالة</b>{e.from_status&&<SBadge status={e.from_status}/>}<span>←</span><SBadge status={e.to_status}/></span>});
+    else if(e.type==='assign'){const c=e.changes?.assigned_to||{};rows.push({k:e.id,at:e.created_at,icon:'📋',color:'var(--purple)',user:e.user_name,body:<><b>وزّع الأوردر على {nameU(c.new)}</b>{c.old&&<span style={{color:'var(--text3)'}}> (كان: {nameU(c.old)})</span>}</>});}
+    else if(e.type==='edit') rows.push({k:e.id,at:e.created_at,icon:'✏️',color:'var(--yellow)',user:e.user_name,body:<><b>عدّل البيانات</b>{Object.entries(e.changes||{}).map(([k,v])=><div key={k} style={{fontSize:11,color:'var(--text2)',marginTop:3}}><span style={{color:'var(--text3)'}}>{FIELD_LABELS[k]||k}:</span> {fv(k,v.old)} <span style={{color:'var(--text3)'}}>←</span> <b>{fv(k,v.new)}</b></div>)}</>});
+  });
+  if(list.length===0&&order.status_updated_at&&Math.abs(new Date(order.status_updated_at)-new Date(order.created_at))>120000)
+    rows.push({k:'legacy',at:order.status_updated_at,icon:'🔄',color:'var(--orange)',user:null,body:<span style={{display:'inline-flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><b>آخر تغيير للحالة</b><SBadge status={order.status}/><span style={{color:'var(--text3)',fontSize:10}}>(قبل تفعيل التتبع التفصيلي)</span></span>});
+  rows.sort((a,b)=>new Date(a.at)-new Date(b.at));
+  const cnt=t=>list.filter(e=>e.type===t).length;
+  return <div style={{marginBottom:14}}>
+    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:10}}>
+      <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>🕘 تاريخ الأوردر</div>
+      {Array.isArray(events)&&<>
+        <span className="chip" style={{fontSize:10}}>🔄 الحالة اتغيّرت {cnt('status')} مرة</span>
+        <span className="chip" style={{fontSize:10}}>✏️ البيانات اتعدّلت {cnt('edit')} مرة</span>
+        {cnt('assign')>0&&<span className="chip" style={{fontSize:10}}>📋 توزيع {cnt('assign')} مرة</span>}
+      </>}
+    </div>
+    {events===null?<div style={{fontSize:12,color:'var(--text3)',padding:'10px 0'}}>⏳ جاري التحميل...</div>:<div>
+      {events===false&&<div style={{fontSize:11,color:'var(--text3)',marginBottom:8}}>التاريخ التفصيلي غير مفعّل بعد — شغّل history-migration.sql في Supabase</div>}
+      {rows.map((r,i)=><div key={r.k} style={{display:'flex',gap:10}}>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center'}}>
+          <div style={{width:26,height:26,borderRadius:'50%',background:'var(--bg3)',border:`1px solid ${r.color}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,flexShrink:0}}>{r.icon}</div>
+          {i<rows.length-1&&<div style={{width:2,flex:1,background:'var(--border)',minHeight:12}}/>}
+        </div>
+        <div style={{flex:1,minWidth:0,paddingBottom:12,fontSize:12,color:'var(--text2)'}}>
+          <div>{r.body}</div>
+          <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>{fmtDate(r.at)}{r.user?` · ${r.user}`:''}</div>
+        </div>
+      </div>)}
+    </div>}
+  </div>;
+};
+
+const SHIPPED_OUT = ['shipped','delivered','not_delivered'];
+const localISODate = d => new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+const DayStats = () => {
+  const [day,setDay] = useState(()=>localISODate(new Date()));
+  const [rows,setRows] = useState(null);
+  const today = localISODate(new Date());
+  useEffect(()=>{
+    let alive=true; setRows(null);
+    (async()=>{
+      const from=new Date(day+'T00:00:00'); const to=new Date(from); to.setDate(to.getDate()+1);
+      let all=[],i=0;
+      for(;;){
+        const {data,error}=await sb.from('orders').select('status').gte('created_at',from.toISOString()).lt('created_at',to.toISOString()).order('created_at').order('id').range(i,i+999);
+        if(error||!data) break;
+        all=all.concat(data); if(data.length<1000) break; i+=1000;
+      }
+      if(alive) setRows(all);
+    })();
+    return()=>{alive=false;};
+  },[day]);
+  const shift = n => { const d=new Date(day+'T00:00:00'); d.setDate(d.getDate()+n); setDay(localISODate(d)); };
+  const yest = (()=>{const d=new Date();d.setDate(d.getDate()-1);return localISODate(d);})();
+  const total=rows?rows.length:0;
+  const n=st=>rows?rows.filter(o=>o.status===st).length:0;
+  const confirmed=n('confirmed');
+  const shippedOut=rows?rows.filter(o=>SHIPPED_OUT.includes(o.status)).length:0;
+  const cancelled=n('cancelled');
+  const open=total-confirmed-shippedOut-cancelled;
+  const rate=total?((confirmed+shippedOut)/total*100):0;
+  const v=x=>rows===null?'…':x;
+  const cards=[{c:'blue',i:'📦',l:'أوردرات اليوم (جديدة)',v:v(total)},{c:'green',i:'✅',l:'مؤكدة',v:v(confirmed)},{c:'orange',i:'🚚',l:'خرجت للشحن',v:v(shippedOut)},{c:'red',i:'❌',l:'ملغية',v:v(cancelled)},{c:'yellow',i:'⏳',l:'لسه مفتوحة',v:v(open)},{c:'green',i:'📈',l:'نسبة التأكيد',v:rows===null?'…':rate.toFixed(1)+'%'}];
+  return <div className="table-wrap" style={{padding:16,marginBottom:16}}>
+    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:14}}>
+      <div>
+        <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>📅 إحصائيات يوم</div>
+        <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{new Date(day+'T00:00:00').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
+      </div>
+      <div style={{marginRight:'auto',display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>shift(-1)}>⏮ اليوم السابق</button>
+        <input type="date" className="input" style={{width:150}} value={day} max={today} onChange={e=>e.target.value&&setDay(e.target.value)}/>
+        <button className="btn btn-ghost btn-sm" disabled={day>=today} onClick={()=>shift(1)}>اليوم التالي ⏭</button>
+        <button className={`btn btn-sm ${day===today?'btn-primary':'btn-ghost'}`} onClick={()=>setDay(today)}>اليوم</button>
+        <button className={`btn btn-sm ${day===yest?'btn-primary':'btn-ghost'}`} onClick={()=>setDay(yest)}>امبارح</button>
+      </div>
+    </div>
+    <div className="stats-grid" style={{marginBottom:12}}>
+      {cards.map((x,i)=><div key={i} className={`stat-card ${x.c}`}><div className="stat-icon">{x.i}</div><div className="stat-label">{x.l}</div><div className="stat-value">{x.v}</div></div>)}
+    </div>
+    <div style={{height:8,background:'var(--bg3)',borderRadius:6,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(rate,100)}%`,background:'var(--green)',transition:'width .3s'}}/></div>
+    <div style={{fontSize:10,color:'var(--text3)',marginTop:8,lineHeight:1.7}}>نسبة التأكيد = (مؤكدة + خرجت للشحن) ÷ إجمالي أوردرات اليوم × 100. "خرجت للشحن" بتشمل اللي في الشحن والمسلّم ولم يتسلّم. الأرقام حسب الحالة الحالية للأوردرات اللي اتعملت في اليوم ده.</div>
+  </div>;
 };
 const statusTime = o => o.status_updated_at||o.updated_at||o.created_at;
 const StatusTime = ({o}) => <div style={{fontSize:9,color:'var(--text3)',marginTop:3,whiteSpace:'nowrap'}} title="وقت آخر تغيير للحالة">🕒 {fmtDate(statusTime(o))}</div>;
@@ -532,6 +645,7 @@ const Dashboard = ({user}) => {
 
   return <div className="page">
     <div className="page-header"><div><div className="page-title">لوحة التحكم 📊</div><div className="page-sub">مرحباً {user.name} — {new Date().toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div></div>
+    <DayStats/>
     <div className="stats-grid">
       {cards.map((x,i)=><div key={i} className={`stat-card ${x.c}`}><div className="stat-icon">{x.i}</div><div className="stat-label">{x.l}</div><div className="stat-value" style={x.sm?{fontSize:16}:{}}>{x.v}</div></div>)}
     </div>
@@ -815,8 +929,8 @@ const OrdersPage = ({user}) => {
               {au&&<div style={{fontSize:11,color:'var(--text3)',marginBottom:10}}>👤 مسند لـ: <span style={{color:'var(--text2)',fontWeight:600}}>{au.name}</span></div>}
               {/* Quick contact */}
               <div style={{display:'flex',gap:8,marginBottom:10}}>
-                <a href={`tel:${o.customer_phone}`} className="btn btn-success btn-sm" style={{flex:1,justifyContent:'center',textDecoration:'none'}}>📞 اتصال</a>
-                <a href={`https://wa.me/${intlPhone}?text=${encodeURIComponent('مرحباً '+o.customer_name+'، بخصوص طلبكم رقم '+o.order_ref)}`} target="_blank" rel="noreferrer" className="btn btn-sm" style={{flex:1,justifyContent:'center',background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
+                <a href={`tel:${o.customer_phone}`} onClick={()=>logContact(o.id,'call',user)} className="btn btn-success btn-sm" style={{flex:1,justifyContent:'center',textDecoration:'none'}}>📞 اتصال</a>
+                <a href={`https://wa.me/${intlPhone}?text=${encodeURIComponent('مرحباً '+o.customer_name+'، بخصوص طلبكم رقم '+o.order_ref)}`} target="_blank" rel="noreferrer" onClick={()=>logContact(o.id,'whatsapp',user)} className="btn btn-sm" style={{flex:1,justifyContent:'center',background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
               </div>
               {/* Actions */}
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -869,6 +983,18 @@ const DetailModal = ({order,user,affs,users,doStatus,onEdit,onPrint,onClose,dups
     sb.from('order_notes').select('*').eq('order_id',order.id).order('created_at').then(({data})=>setNotes(data||[]));
   },[order.id]);
 
+  const [events,setEvents] = useState(null);   // null = تحميل | false = مش مفعّل
+  useEffect(()=>{
+    let alive=true; setEvents(null);
+    if(user.role!=='admin') return;            // التاريخ وتتبع الاتصال للأدمن بس
+    sb.from('order_events').select('*').eq('order_id',order.id).order('created_at',{ascending:true}).then(({data,error})=>{ if(alive) setEvents(error?false:(data||[])); });
+    return()=>{alive=false;};
+  },[order.id]);
+  const trackContact = (type,extra) => {
+    logContact(order.id,type,user,extra);
+    setEvents(e=>Array.isArray(e)?[...e,{id:'tmp'+Date.now(),order_id:order.id,type,user_id:user.id,user_name:user.name,created_at:now(),changes:extra||null}]:e);
+  };
+
   const addNote = async () => {
     if(!note.trim()) return;
     const n={id:uid(),order_id:order.id,user_id:user.id,user_name:user.name,note:note.trim(),created_at:now()};
@@ -918,20 +1044,21 @@ const DetailModal = ({order,user,affs,users,doStatus,onEdit,onPrint,onClose,dups
           <div style={{fontSize:10,color:'var(--text3)',fontWeight:700,marginBottom:2}}>رقم العميل</div>
           <div style={{fontSize:14,fontWeight:700,color:'var(--text)',direction:'ltr',textAlign:'right'}}>{order.customer_phone}{order.customer_alt_phone&&<span style={{fontSize:11,color:'var(--text3)',marginRight:8}}> / {order.customer_alt_phone}</span>}</div>
         </div>
-        <a href={`tel:${order.customer_phone}`} className="btn btn-success btn-sm" style={{textDecoration:'none',flexShrink:0}}>
+        <a href={`tel:${order.customer_phone}`} onClick={()=>trackContact('call')} className="btn btn-success btn-sm" style={{textDecoration:'none',flexShrink:0}}>
           📞 اتصال
         </a>
-        <a href={`https://wa.me/${intlPhone}?text=${waMsg}`} target="_blank" rel="noreferrer" className="btn btn-sm" style={{background:'#25D366',color:'#fff',textDecoration:'none',flexShrink:0}}>
+        <a href={`https://wa.me/${intlPhone}?text=${waMsg}`} target="_blank" rel="noreferrer" onClick={()=>trackContact('whatsapp')} className="btn btn-sm" style={{background:'#25D366',color:'#fff',textDecoration:'none',flexShrink:0}}>
           💬 واتساب
         </a>
         {order.customer_alt_phone&&(()=>{
           const r2=order.customer_alt_phone.replace(/\D/g,'');
-          return <a href={`tel:${order.customer_alt_phone}`} className="btn btn-ghost btn-sm" style={{textDecoration:'none',flexShrink:0}}>
+          return <a href={`tel:${order.customer_alt_phone}`} onClick={()=>trackContact('call',{alt:true})} className="btn btn-ghost btn-sm" style={{textDecoration:'none',flexShrink:0}}>
             📞 بديل
           </a>;
         })()}
       </div>;
     })()}
+    {user.role==='admin'&&<ContactSummary events={events}/>}
     {avail.length>0&&<div style={{background:'var(--bg3)',borderRadius:8,padding:12,marginBottom:14}}>
       <div style={{fontSize:11,color:'var(--text3)',marginBottom:8,fontWeight:700}}>تغيير الحالة:</div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{avail.map(s=><button key={s} className="btn btn-ghost btn-sm" onClick={()=>{doStatus(order.id,s);onClose();}}>{SL[s]}</button>)}</div>
@@ -945,6 +1072,8 @@ const DetailModal = ({order,user,affs,users,doStatus,onEdit,onPrint,onClose,dups
     </div>
     {order.note&&<div style={{background:'var(--yellow-bg)',borderRadius:8,padding:10,marginBottom:12}}><div style={{fontSize:10,fontWeight:700,color:'var(--yellow)',marginBottom:4}}>ملاحظات الأوردر</div><div style={{fontSize:12,color:'var(--text)'}}>{order.note}</div></div>}
     <div className="divider"/>
+    {user.role==='admin'&&<><OrderTimeline order={order} events={events} users={users} affs={affs}/>
+    <div className="divider"/></>}
     <div style={{marginBottom:10,fontSize:13,fontWeight:700,color:'var(--text)'}}>💬 ملاحظات الكول سنتر</div>
     <div style={{maxHeight:180,overflowY:'auto',marginBottom:12}}>
       {notes.length===0?<div style={{fontSize:12,color:'var(--text3)',textAlign:'center',padding:'16px 0'}}>لا توجد ملاحظات</div>:notes.map(n=><div key={n.id} className="note-item"><div className="note-text">{n.note}</div><div className="note-meta">{n.user_name} · {fmtDate(n.created_at)}</div></div>)}
@@ -1368,6 +1497,7 @@ const ShippingPage = ({user}) => {
   const filtered=orders.filter(o=>o.status===tab&&(!search||`${o.order_ref} ${o.customer_name} ${o.customer_phone} ${o.city}`.toLowerCase().includes(search.toLowerCase())));
   const paged=filtered.slice((page-1)*DEFAULT_PS,page*DEFAULT_PS);
   const acts={confirmed:['shipped'],shipped:['delivered','not_delivered'],delivered:[],not_delivered:['shipped']};
+  const bulkAllowed=user.role==='admin'?Object.keys(SL):acts[tab];
 
   const doStatus=async(id,status)=>{
     const o=orders.find(x=>x.id===id);
@@ -1453,8 +1583,8 @@ const ShippingPage = ({user}) => {
               </div>
               {o.product_name&&<div style={{fontSize:12,color:'var(--text2)',marginBottom:10}}>📦 {o.product_name} ×{o.quantity||1}</div>}
               <div style={{display:'flex',gap:8,marginBottom:10}}>
-                <a href={`tel:${o.customer_phone}`} className="btn btn-success btn-sm" style={{flex:1,justifyContent:'center',textDecoration:'none'}}>📞 اتصال</a>
-                <a href={`https://wa.me/${intlPhone}?text=${encodeURIComponent('مرحباً '+o.customer_name+'، بخصوص طلبكم رقم '+o.order_ref)}`} target="_blank" rel="noreferrer" className="btn btn-sm" style={{flex:1,justifyContent:'center',background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
+                <a href={`tel:${o.customer_phone}`} onClick={()=>logContact(o.id,'call',user)} className="btn btn-success btn-sm" style={{flex:1,justifyContent:'center',textDecoration:'none'}}>📞 اتصال</a>
+                <a href={`https://wa.me/${intlPhone}?text=${encodeURIComponent('مرحباً '+o.customer_name+'، بخصوص طلبكم رقم '+o.order_ref)}`} target="_blank" rel="noreferrer" onClick={()=>logContact(o.id,'whatsapp',user)} className="btn btn-sm" style={{flex:1,justifyContent:'center',background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
                 <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={()=>setPrint([o])}>🖨️</button>
               </div>
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -1470,10 +1600,10 @@ const ShippingPage = ({user}) => {
       <span className="bulk-count">{sel.length} محدد</span>
       <div className="bulk-actions">
         {sel.length<filtered.length&&<button className="btn btn-ghost btn-sm" onClick={()=>setSel(filtered.map(o=>o.id))}>☑️ تحديد كل النتائج ({filtered.length})</button>}
-        {acts[tab].length>0&&<button className="btn btn-warning btn-sm" onClick={()=>setBulkStatus(true)}>🔄 تغيير الحالة</button>}
+        <button className="btn btn-warning btn-sm" disabled={bulkAllowed.length===0} title={bulkAllowed.length===0?'مفيش حالات متاحة للتغيير من التاب ده':''} onClick={()=>setBulkStatus(true)}>🔄 تغيير الحالة</button>
         <button className="btn btn-ghost btn-sm" onClick={()=>setPrint(orders.filter(o=>sel.includes(o.id)))}>🖨️ طباعة</button><button className="btn btn-ghost btn-sm" onClick={()=>setSel([])}>✕</button></div>
     </div>}
-    {bulkStatus&&<BulkStatusModal orders={orders.filter(o=>sel.includes(o.id))} allowed={acts[tab]} user={user} onClose={done=>{setBulkStatus(false);if(done)setSel([]);load();}}/>}
+    {bulkStatus&&<BulkStatusModal orders={orders.filter(o=>sel.includes(o.id))} allowed={bulkAllowed} user={user} onClose={done=>{setBulkStatus(false);if(done)setSel([]);load();}}/>}
   </div>;
 };
 
@@ -1879,6 +2009,7 @@ const Shell = ({user,onLogout}) => {
         <div style={{flex:1,minWidth:0}}><div className="user-name">{user.name}</div><div className="user-role">{RL[user.role]}</div></div>
         <button className="close-btn" onClick={onLogout} title="خروج">🚪</button>
       </div>
+      <div style={{fontSize:9,color:'var(--text3)',textAlign:'center',padding:'0 0 8px',opacity:.7,direction:'ltr'}}>v{APP_VERSION}</div>
     </aside>
     <main className="main-content">
       <div className="topbar">
