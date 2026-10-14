@@ -249,7 +249,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.10.14-history-admin';
+const APP_VERSION = '2026.10.14-wa-filter';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = sessionStorage.getItem('crm_t')||'';
@@ -674,6 +674,8 @@ const OrdersPage = ({user}) => {
   const [fStatus,setFStatus] = useState('');
   const [fAff,setFAff] = useState('');
   const [fAssigned,setFAssigned] = useState('');
+  const [fWa,setFWa] = useState('');          // '' | sent | not_sent
+  const [waMap,setWaMap] = useState(null);   // null=مش أدمن | false=التتبع مش مفعّل | {order_id:{n,last}}
   const [dateFrom,setDateFrom] = useState('');
   const [dateTo,setDateTo] = useState('');
   const [sortBy,setSortBy] = useState('created_at');
@@ -696,6 +698,17 @@ const OrdersPage = ({user}) => {
         : sb.from('orders').select('*').order('created_at',{ascending:false}),
     ]);
     setAffs(a.data||[]); setUsers(u.data||[]); setOrders(o.data||[]); setLoading(false);
+    // الأوردرات اللي اتضغط لها على زرار الواتساب (للأدمن بس)
+    if(user.role==='admin'){
+      const m={}; let i=0, ok=true;
+      for(;;){
+        const {data,error}=await sb.from('order_events').select('order_id,created_at').eq('type','whatsapp').order('created_at').order('id').range(i,i+999);
+        if(error){ok=false;break;}
+        (data||[]).forEach(r=>{const e=m[r.order_id]||(m[r.order_id]={n:0,last:null});e.n++;e.last=r.created_at;});
+        if((data||[]).length<1000) break; i+=1000;
+      }
+      setWaMap(ok?m:false);
+    } else setWaMap(null);
   },[user]);
 
   useEffect(()=>{load();},[load]);
@@ -707,6 +720,7 @@ const OrdersPage = ({user}) => {
       if(fAff&&o.affiliate_id!==fAff) return false;
       if(fAssigned==='__unassigned__'&&o.assigned_to) return false;
       else if(fAssigned&&fAssigned!=='__unassigned__'&&o.assigned_to!==fAssigned) return false;
+      if(fWa&&waMap){const has=!!waMap[o.id]; if(fWa==='sent'&&!has) return false; if(fWa==='not_sent'&&has) return false;}
       if(dateFrom&&o.created_at&&o.created_at<dateFrom) return false;
       if(dateTo&&o.created_at&&o.created_at>dateTo+'T23:59:59') return false;
       return true;
@@ -719,7 +733,7 @@ const OrdersPage = ({user}) => {
       return sortDir==='asc'?String(av).localeCompare(String(bv),'ar'):String(bv).localeCompare(String(av),'ar');
     });
     return res;
-  },[orders,search,fStatus,fAff,fAssigned,dateFrom,dateTo,sortBy,sortDir]);
+  },[orders,search,fStatus,fAff,fAssigned,fWa,waMap,dateFrom,dateTo,sortBy,sortDir]);
 
   const paged = filtered.slice((page-1)*ps, page*ps);
   const allChk = paged.length>0&&paged.every(o=>sel.includes(o.id));
@@ -758,6 +772,7 @@ const OrdersPage = ({user}) => {
         {sel.length>0&&<button className="btn btn-ghost" onClick={()=>setPrint(orders.filter(o=>sel.includes(o.id)))}>🖨️ طباعة ({sel.length})</button>}
         {user.role==='admin'&&<>
           <button className="btn btn-ghost" onClick={()=>exportConfirmedOrders(orders.filter(o=>o.status==='confirmed'),affs,dupMap)}>📥 تصدير مؤكدة</button>
+          <button className="btn btn-ghost" disabled={sel.length===0} title={sel.length===0?'حدد أوردرات الأول':''} onClick={()=>exportConfirmedOrders(orders.filter(o=>sel.includes(o.id)),affs,dupMap,'selected_orders')}>📤 تصدير المحدد ({sel.length})</button>
           <button className="btn btn-ghost" onClick={()=>setM('add',true)}>➕ إضافة</button>
           <button className="btn btn-primary" onClick={()=>setM('import',true)}>📤 استيراد Excel</button>
         </>}
@@ -795,8 +810,13 @@ const OrdersPage = ({user}) => {
               <option value="__unassigned__">غير مسند</option>
               {ccUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
+            <select className="input select" style={{flex:1,minWidth:130}} value={fWa} disabled={waMap===false} title={waMap===false?'تتبع الواتساب غير مفعّل (شغّل history-migration.sql)':'فلتر حسب الضغط على زرار الواتساب'} onChange={e=>{setFWa(e.target.value);setPage(1)}}>
+              <option value="">💬 الواتساب: الكل</option>
+              <option value="sent">اتبعتلها واتساب</option>
+              <option value="not_sent">مبعتلهاش واتساب</option>
+            </select>
           </>}
-          {(fStatus||fAff||fAssigned||dateFrom||dateTo||search)&&<button className="btn btn-danger btn-sm" onClick={()=>{setSearch('');setFStatus('');setFAff('');setFAssigned('');setDateFrom('');setDateTo('');setPage(1);}} title="مسح الفلاتر">✕ مسح</button>}
+          {(fStatus||fAff||fAssigned||fWa||dateFrom||dateTo||search)&&<button className="btn btn-danger btn-sm" onClick={()=>{setSearch('');setFStatus('');setFAff('');setFAssigned('');setFWa('');setDateFrom('');setDateTo('');setPage(1);}} title="مسح الفلاتر">✕ مسح</button>}
         </div>
         {/* Row 3: Advanced filters (date + sort) */}
         {showAdvanced&&<div style={{background:'var(--bg3)',borderRadius:10,padding:12,display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-end'}}>
@@ -866,7 +886,7 @@ const OrdersPage = ({user}) => {
                 const acts=getActs(o);
                 return <tr key={o.id} className={isSel?'selected':''} onClick={()=>setM('detail',o)}>
                   <td className="td-check" onClick={e=>{e.stopPropagation();setSel(s=>s.includes(o.id)?s.filter(x=>x!==o.id):[...s,o.id])}}><input type="checkbox" checked={isSel} onChange={()=>{}}/></td>
-                  <td className="bold" style={{fontSize:11}}>{o.order_ref}<DupBadge d={dupMap[o.id]}/></td>
+                  <td className="bold" style={{fontSize:11}}>{o.order_ref}<DupBadge d={dupMap[o.id]}/>{waMap&&waMap[o.id]&&<div title="اتضغط على زرار الواتساب" style={{marginTop:3,fontSize:9,fontWeight:700,color:'var(--green)'}}>💬 واتساب ×{waMap[o.id].n}</div>}</td>
                   <td><div style={{fontWeight:600,color:'var(--text)',fontSize:12}}>{o.customer_name}</div><div style={{fontSize:10,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div></td>
                   <td style={{fontSize:11}}>{o.city||'-'}</td>
                   <td style={{maxWidth:130,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11}}>{o.product_name||'-'}</td>
@@ -909,7 +929,7 @@ const OrdersPage = ({user}) => {
                     {aff&&<span className="chip" style={{fontSize:9}}>🎯 {aff.name}</span>}
                   </div>
                   <StatusTime o={o}/>
-                  <DupBadge d={dupMap[o.id]} full/>
+                  <DupBadge d={dupMap[o.id]} full/>{waMap&&waMap[o.id]&&<div style={{marginTop:6,fontSize:10,fontWeight:700,color:'var(--green)'}}>💬 اتبعتلها واتساب ×{waMap[o.id].n}</div>}
                   <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>{fmtShort(o.created_at)}</div>
                 </div>
                 <div style={{fontWeight:800,color:'var(--accent)',fontSize:15}}>{fmtMoney(fp)}</div>
@@ -954,6 +974,7 @@ const OrdersPage = ({user}) => {
       <div className="bulk-actions">
         <button className="btn btn-ghost btn-sm" onClick={()=>setPrint(orders.filter(o=>sel.includes(o.id)))}>🖨️ طباعة</button>
         {sel.length<filtered.length&&<button className="btn btn-ghost btn-sm" onClick={()=>setSel(filtered.map(o=>o.id))}>☑️ تحديد كل النتائج ({filtered.length})</button>}
+        {user.role==='admin'&&<button className="btn btn-ghost btn-sm" onClick={()=>exportConfirmedOrders(orders.filter(o=>sel.includes(o.id)),affs,dupMap,'selected_orders')}>📤 تصدير</button>}
         <button className="btn btn-warning btn-sm" onClick={()=>setM('bulkStatus',true)}>🔄 تغيير الحالة</button>
         {user.role==='admin'&&<button className="btn btn-primary btn-sm" onClick={()=>setM('bulkAssign',true)}>📋 توزيع</button>}
         <button className="btn btn-ghost btn-sm" onClick={()=>setSel([])}>✕</button>
@@ -1393,8 +1414,8 @@ const BulkStatusModal = ({orders:sel,allowed,user,onClose}) => {
 /* ═══════════════════════════════════
    EXPORT CONFIRMED ORDERS TO EXCEL (Template Format)
 ═══════════════════════════════════ */
-const exportConfirmedOrders = (orders, affiliates, dupMap={}) => {
-  if(!orders||orders.length===0){toast('لا توجد أوردرات مؤكدة للتصدير','error');return;}
+const exportConfirmedOrders = (orders, affiliates, dupMap={}, fileLabel='confirmed_orders') => {
+  if(!orders||orders.length===0){toast(fileLabel==='confirmed_orders'?'لا توجد أوردرات مؤكدة للتصدير':'حدد أوردرات للتصدير الأول','error');return;}
   const days_ar = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   const rows = orders.map((o,i) => {
     const d = new Date(o.created_at||new Date());
@@ -1464,7 +1485,7 @@ const exportConfirmedOrders = (orders, affiliates, dupMap={}) => {
   XLSX.utils.book_append_sheet(wb, ws, 'التسجيل');
 
   const date = new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'-');
-  XLSX.writeFile(wb, `confirmed_orders_${date}.xlsx`);
+  XLSX.writeFile(wb, `${fileLabel}_${date}.xlsx`);
   toast(`تم تصدير ${orders.length} أوردر ✅`, 'success');
 };
 
@@ -1515,6 +1536,7 @@ const ShippingPage = ({user}) => {
       <div><div className="page-title">قسم الشحن 🚚</div></div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
         {tab==='confirmed'&&<button className="btn btn-success" onClick={()=>exportConfirmedOrders(orders.filter(o=>o.status==='confirmed'),affs,dupMap)}>📥 تصدير Excel</button>}
+        <button className="btn btn-ghost" disabled={sel.length===0} title={sel.length===0?'حدد أوردرات الأول':''} onClick={()=>exportConfirmedOrders(orders.filter(o=>sel.includes(o.id)),affs,dupMap,'selected_orders')}>📤 تصدير المحدد ({sel.length})</button>
         {sel.length>0&&<button className="btn btn-ghost" onClick={()=>setPrint(orders.filter(o=>sel.includes(o.id)))}>🖨️ طباعة ({sel.length})</button>}
       </div>
     </div>
