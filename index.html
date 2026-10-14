@@ -249,7 +249,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.10.14-wa-filter';
+const APP_VERSION = '2026.10.14-import-fix';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = sessionStorage.getItem('crm_t')||'';
@@ -467,6 +467,15 @@ const DayStats = () => {
     <div style={{height:8,background:'var(--bg3)',borderRadius:6,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(rate,100)}%`,background:'var(--green)',transition:'width .3s'}}/></div>
     <div style={{fontSize:10,color:'var(--text3)',marginTop:8,lineHeight:1.7}}>نسبة التأكيد = (مؤكدة + خرجت للشحن) ÷ إجمالي أوردرات اليوم × 100. "خرجت للشحن" بتشمل اللي في الشحن والمسلّم ولم يتسلّم. الأرقام حسب الحالة الحالية للأوردرات اللي اتعملت في اليوم ده.</div>
   </div>;
+};
+const existingRefs = async refs => {
+  const found=new Set();
+  for(let i=0;i<refs.length;i+=150){
+    const {data,error}=await sb.from('orders').select('order_ref').in('order_ref',refs.slice(i,i+150));
+    if(error) return {error};
+    (data||[]).forEach(o=>found.add(String(o.order_ref)));
+  }
+  return {found};
 };
 const statusTime = o => o.status_updated_at||o.updated_at||o.created_at;
 const StatusTime = ({o}) => <div style={{fontSize:9,color:'var(--text3)',marginTop:3,whiteSpace:'nowrap'}} title="وقت آخر تغيير للحالة">🕒 {fmtDate(statusTime(o))}</div>;
@@ -1198,8 +1207,10 @@ const ImportModal = ({user,affs,onClose}) => {
     reader.onload = async e => {
       const wb=XLSX.read(e.target.result,{type:'binary'});
       const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-      const {data:ex}=await sb.from('orders').select('order_ref');
-      const exist=new Set((ex||[]).map(o=>String(o.order_ref)));
+      const sheetRefs=[...new Set(data.map(r=>{const t={};Object.entries(r).forEach(([k,v])=>{const f=EXCEL_MAP[k];if(f)t[f]=v;});return String(t.order_ref||r['ID']||'').trim();}).filter(Boolean))];
+      const chk=await existingRefs(sheetRefs);
+      if(chk.error){toast('تعذر فحص الأوردرات الموجودة: '+chk.error.message,'error');return;}
+      const exist=chk.found, seen=new Set();
       const ers=[],valid=[];
       data.forEach((row,i)=>{
         const m={};
@@ -1209,6 +1220,8 @@ const ImportModal = ({user,affs,onClose}) => {
         if(!ref2){ers.push(`صف ${i+2}: ID مفقود`);return;}
         if(!name){ers.push(`صف ${i+2}: اسم العميل مفقود`);return;}
         if(exist.has(ref2)){ers.push(`صف ${i+2}: ${ref2} موجود مسبقاً`);return;}
+        if(seen.has(ref2)){ers.push(`صف ${i+2}: ${ref2} مكرر داخل الملف (اتاخد أول صف بس)`);return;}
+        seen.add(ref2);
         let ca=now();
         if(m.created_at){const n=parseFloat(m.created_at);if(!isNaN(n)&&n>40000)ca=new Date((n-25569)*86400*1000).toISOString();}
         valid.push({id:uid(),order_ref:ref2,external_id:String(m.external_id||'').trim(),customer_name:name,customer_phone:String(m.customer_phone||'').trim(),customer_alt_phone:String(m.customer_alt_phone||'').trim(),city:String(m.city||'').trim(),customer_address:String(m.customer_address||'').trim(),product_name:String(m.product_name||'').trim(),variant:String(m.variant||'').trim(),sku:String(m.sku||'').trim(),quantity:parseInt(m.quantity||1)||1,item_price:parseFloat(m.item_price||0)||0,total_cost:parseFloat(m.total_cost||0)||0,product_cost:parseFloat(m.product_cost||0)||0,shipping_cost:parseFloat(m.shipping_cost||0)||0,coupon:String(m.coupon||'').trim(),coupon_discount:parseFloat(m.coupon_discount||0)||0,discount:0,source:String(m.source||'').trim(),utm_campaign:String(m.utm_campaign||'').trim(),payment_method:String(m.payment_method||'cod').trim(),note:String(m.note||'').trim(),referral_code:String(m.referral_code||'').trim(),status:'new',affiliate_id:null,assigned_to:null,created_at:ca,updated_at:now()});
@@ -1222,14 +1235,22 @@ const ImportModal = ({user,affs,onClose}) => {
     setImporting(true);
     const status = defCC ? 'assigned' : 'new';
     const ins=rows.map(r=>({...r,affiliate_id:defAff||null,assigned_to:defCC||null,status}));
+    let done=0, skipped=0;
     for(let i=0;i<ins.length;i+=100){
-      const {error}=await sb.from('orders').insert(ins.slice(i,i+100));
-      if(error){toast('خطأ: '+error.message,'error');setImporting(false);return;}
+      const chunk=ins.slice(i,i+100);
+      const chk=await existingRefs(chunk.map(r=>r.order_ref));   // فحص أخير قبل الإدخال (لو حد استورد في نفس الوقت)
+      if(chk.error){toast(`خطأ بعد استيراد ${done} أوردر: `+chk.error.message,'error');setImporting(false);return;}
+      const fresh=chunk.filter(r=>!chk.found.has(r.order_ref)); skipped+=chunk.length-fresh.length;
+      if(fresh.length){
+        const {error}=await sb.from('orders').insert(fresh);
+        if(error){toast(`خطأ بعد استيراد ${done} أوردر: `+error.message,'error');setImporting(false);return;}
+        done+=fresh.length;
+      }
     }
     const ccName = ccUsers.find(u=>u.id===defCC)?.name||'';
-    const detail = `تم استيراد ${rows.length} أوردر من ${fname}${defAff?' | أفيلييت: '+affs.find(a=>a.id===defAff)?.name:''}${defCC?' | مسند لـ: '+ccName:''}`;
+    const detail = `تم استيراد ${done} أوردر من ${fname}${skipped?` (تخطي ${skipped} موجودين مسبقاً)`:''}${defAff?' | أفيلييت: '+affs.find(a=>a.id===defAff)?.name:''}${defCC?' | مسند لـ: '+ccName:''}`;
     await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'استيراد أوردرات',entity:'orders',detail,created_at:now()});
-    toast(`تم استيراد ${rows.length} أوردر ✅`,'success'); onClose();
+    toast(`تم استيراد ${done} أوردر ✅${skipped?` (وتم تخطي ${skipped} موجودين مسبقاً)`:''}`,'success'); onClose();
   };
 
   const dlTemplate = () => {
