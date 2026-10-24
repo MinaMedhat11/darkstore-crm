@@ -262,7 +262,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.10.14-presence';
+const APP_VERSION = '2026.10.14-import-ranges';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = localStorage.getItem('crm_t')||'';
@@ -370,7 +370,7 @@ const DupBadge = ({d,full}) => {
   return <div title={tip} style={{marginTop:3,fontSize:9,fontWeight:700,color:'var(--orange)',whiteSpace:'nowrap'}}>🔁 مكرر · {w.rel}{more}</div>;
 };
 /* ═══ تاريخ حياة الأوردر + تتبع الاتصال والواتساب + إحصائيات اليوم ═══ */
-const FIELD_LABELS = {customer_name:'الاسم',customer_phone:'الموبايل',customer_alt_phone:'التليفون البديل',city:'المحافظة',customer_address:'العنوان',product_name:'المنتج',variant:'النوع',sku:'SKU',quantity:'الكمية',item_price:'سعر الوحدة',total_cost:'الإجمالي',product_cost:'تكلفة المنتج',shipping_cost:'الشحن',coupon:'الكوبون',coupon_discount:'خصم الكوبون',discount:'الخصم',source:'المصدر',utm_campaign:'الحملة',payment_method:'طريقة الدفع',note:'الملاحظة',referral_code:'كود الإحالة',affiliate_id:'الأفيليت',external_id:'الرقم الخارجي',order_ref:'رقم الأوردر'};
+const FIELD_LABELS = {customer_name:'الاسم',customer_phone:'الموبايل',customer_alt_phone:'التليفون البديل',city:'المحافظة',area:'المنطقة',customer_address:'العنوان',product_name:'المنتج',variant:'النوع',sku:'SKU',quantity:'الكمية',item_price:'سعر الوحدة',total_cost:'الإجمالي',product_cost:'تكلفة المنتج',shipping_cost:'الشحن',coupon:'الكوبون',coupon_discount:'خصم الكوبون',discount:'الخصم',source:'المصدر',utm_campaign:'الحملة',payment_method:'طريقة الدفع',note:'الملاحظة',referral_code:'كود الإحالة',affiliate_id:'الأفيليت',external_id:'الرقم الخارجي',order_ref:'رقم الأوردر'};
 const logContact = (orderId,type,user,extra) => { sb.from('order_events').insert({order_id:orderId,type,user_id:user.id,user_name:user.name,...(extra?{changes:extra}:{})}).then(()=>{},()=>{}); };
 
 const ContactSummary = ({events}) => {
@@ -584,6 +584,7 @@ const PresenceCard = ({me}) => {
     <div style={{fontSize:10,color:'var(--text3)',marginTop:10,lineHeight:1.7}}>"نشط الآن" = بيتفاعل مع التطبيق في آخر دقيقتين. "خامل" = الصفحة مفتوحة بس من غير تفاعل أو في الخلفية. الموبايل بيوقف الصفحات المقفولة فبيظهر غير متصل.</div>
   </div>;
 };
+const waText = name => `مساء الخير يا أ/ ${name}، مع حضرتك شركة Dark Store بنكلم حضرتك بخصوص أوردر مشد البطن، ممكن الوزن؟ و حضرتك عايزة اللون الأسود ولا البيج؟`;
 const statusTime = o => o.status_updated_at||o.updated_at||o.created_at;
 const StatusTime = ({o}) => <div style={{fontSize:9,color:'var(--text3)',marginTop:3,whiteSpace:'nowrap'}} title="وقت آخر تغيير للحالة">🕒 {fmtDate(statusTime(o))}</div>;
 const SBadge = ({status}) => <span className={`badge ${SC[status]||'badge-new'}`}><span className="badge-dot" style={{background:'currentColor'}}/>{SL[status]||status}</span>;
@@ -1067,7 +1068,7 @@ const OrdersPage = ({user}) => {
               {/* Quick contact */}
               <div style={{display:'flex',gap:8,marginBottom:10}}>
                 <a href={`tel:${o.customer_phone}`} onClick={()=>logContact(o.id,'call',user)} className="btn btn-success btn-sm" style={{flex:1,justifyContent:'center',textDecoration:'none'}}>📞 اتصال</a>
-                <a href={`https://wa.me/${intlPhone}?text=${encodeURIComponent('مرحباً '+o.customer_name+'، بخصوص طلبكم رقم '+o.order_ref)}`} target="_blank" rel="noreferrer" onClick={()=>logContact(o.id,'whatsapp',user)} className="btn btn-sm" style={{flex:1,justifyContent:'center',background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
+                <a href={`https://wa.me/${intlPhone}?text=${encodeURIComponent(waText(o.customer_name))}`} target="_blank" rel="noreferrer" onClick={()=>logContact(o.id,'whatsapp',user)} className="btn btn-sm" style={{flex:1,justifyContent:'center',background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
               </div>
               {/* Actions */}
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -1176,7 +1177,7 @@ const DetailModal = ({order,user,affs,users,doStatus,onEdit,onPrint,onClose,dups
     {order.customer_phone&&(()=>{
       const rawPhone = order.customer_phone.replace(/\D/g,'');
       const intlPhone = rawPhone.startsWith('0') ? '2'+rawPhone : rawPhone;
-      const waMsg = encodeURIComponent(`مرحباً ${order.customer_name}، بخصوص طلبكم رقم ${order.order_ref}`);
+      const waMsg = encodeURIComponent(waText(order.customer_name));
       return <div className="contact-bar" style={{display:'flex',gap:10,marginBottom:14,padding:'10px 12px',background:'var(--bg3)',borderRadius:10,border:'1px solid var(--border)'}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:10,color:'var(--text3)',fontWeight:700,marginBottom:2}}>رقم العميل</div>
@@ -1202,7 +1203,7 @@ const DetailModal = ({order,user,affs,users,doStatus,onEdit,onPrint,onClose,dups
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{avail.map(s=><button key={s} className="btn btn-ghost btn-sm" onClick={()=>{doStatus(order.id,s);onClose();}}>{SL[s]}</button>)}</div>
     </div>}
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
-      {[['رقم الأوردر',order.order_ref],['التليفون',(order.customer_phone+(order.customer_alt_phone?` / ${order.customer_alt_phone}`:''))],['اسم العميل',order.customer_name],['المحافظة',order.city||'-'],].map(([l,v])=><div key={l}><div className="detail-label">{l}</div><div className="detail-value">{v}</div></div>)}
+      {[['رقم الأوردر',order.order_ref],['التليفون',(order.customer_phone+(order.customer_alt_phone?` / ${order.customer_alt_phone}`:''))],['اسم العميل',order.customer_name],['المحافظة',order.city||'-'],['المنطقة',order.area||'-'],].map(([l,v])=><div key={l}><div className="detail-label">{l}</div><div className="detail-value">{v}</div></div>)}
       <div style={{gridColumn:'1/-1'}}><div className="detail-label">العنوان</div><div className="detail-value">{order.customer_address||'-'}</div></div>
       <div className="divider" style={{gridColumn:'1/-1'}}/>
       {[['المنتج',order.product_name||'-'],['الكمية',order.quantity],['سعر الوحدة',fmtMoney(order.item_price)],['الإجمالي',fmtMoney(order.product_cost)],['شحن',fmtMoney(order.shipping_cost||0)],['المستحق',fmtMoney((order.total_cost||0)-(order.discount||0))],].map(([l,v])=><div key={l}><div className="detail-label">{l}</div><div className="detail-value" style={l==='المستحق'?{color:'var(--accent)',fontWeight:800,fontSize:15}:{}}>{v}</div></div>)}
@@ -1254,6 +1255,7 @@ const EditModal = ({order,user,affs,onClose}) => {
       {inp('التليفون','customer_phone')}
       {inp('تليفون بديل','customer_alt_phone')}
       {inp('المحافظة','city')}
+      {inp('المنطقة','area')}
       {inp('العنوان','customer_address','textarea',true)}
       {inp('اسم المنتج','product_name',undefined,true)}
       {inp('المتغير','variant')}
@@ -1301,6 +1303,8 @@ const ImportModal = ({user,affs,onClose}) => {
   const [drag,setDrag] = useState(false);
   const [defAff,setDefAff] = useState('');
   const [defCC,setDefCC] = useState('');
+  const [distMode,setDistMode] = useState('single');            // single | ranges
+  const [ranges,setRanges] = useState([{from:'1',to:'',cc:''}]);
   const [ccUsers,setCCUsers] = useState([]);
   const [importing,setImporting] = useState(false);
   const ref = useRef();
@@ -1339,10 +1343,30 @@ const ImportModal = ({user,affs,onClose}) => {
     reader.readAsBinaryString(file);
   };
 
+  // توزيع بالنطاق: الترقيم حسب ترتيب الأوردرات الجديدة في الملف (1 = أول أوردر)
+  const total = rows.length;
+  const rangeList = ranges.map(r=>({from:parseInt(r.from)||0,to:parseInt(r.to)||0,cc:r.cc,used:!!(r.cc||r.from||r.to)})).filter(r=>r.used);
+  const rangeErr = (()=>{
+    if(distMode!=='ranges') return '';
+    for(const r of rangeList){
+      if(!r.cc) return 'اختار موظف لكل نطاق';
+      if(r.from<1||r.to<r.from) return `النطاق ${r.from}–${r.to} غير صحيح`;
+      if(r.to>total) return `النطاق ${r.from}–${r.to} أكبر من عدد الأوردرات (${total})`;
+    }
+    const srt=[...rangeList].sort((a,b)=>a.from-b.from);
+    for(let i=1;i<srt.length;i++) if(srt[i].from<=srt[i-1].to) return `النطاقين ${srt[i-1].from}–${srt[i-1].to} و ${srt[i].from}–${srt[i].to} متداخلين`;
+    return '';
+  })();
+  const assignIdx = i => distMode==='ranges' ? (rangeList.find(r=>r.cc&&i+1>=r.from&&i+1<=r.to)?.cc||null) : (defCC||null);
+  const setRange = (i,patch) => setRanges(rs=>rs.map((r,k)=>k===i?{...r,...patch}:r));
+  const addRange = () => setRanges(rs=>{const last=parseInt(rs[rs.length-1]?.to)||0; return [...rs,{from:String(last+1),to:'',cc:''}];});
+  const ccName_ = id => ccUsers.find(u=>u.id===id)?.name||'';
+  const assignedCount = rows.filter((_,i)=>assignIdx(i)).length;
+
   const confirm = async () => {
+    if(rangeErr){toast(rangeErr,'error');return;}
     setImporting(true);
-    const status = defCC ? 'assigned' : 'new';
-    const ins=rows.map(r=>({...r,affiliate_id:defAff||null,assigned_to:defCC||null,status}));
+    const ins=rows.map((r,i)=>{const cc=assignIdx(i);return {...r,affiliate_id:defAff||null,assigned_to:cc,status:cc?'assigned':'new'};});
     let done=0, skipped=0;
     for(let i=0;i<ins.length;i+=100){
       const chunk=ins.slice(i,i+100);
@@ -1356,7 +1380,7 @@ const ImportModal = ({user,affs,onClose}) => {
       }
     }
     const ccName = ccUsers.find(u=>u.id===defCC)?.name||'';
-    const detail = `تم استيراد ${done} أوردر من ${fname}${skipped?` (تخطي ${skipped} موجودين مسبقاً)`:''}${defAff?' | أفيلييت: '+affs.find(a=>a.id===defAff)?.name:''}${defCC?' | مسند لـ: '+ccName:''}`;
+    const detail = `تم استيراد ${done} أوردر من ${fname}${skipped?` (تخطي ${skipped} موجودين مسبقاً)`:''}${defAff?' | أفيلييت: '+affs.find(a=>a.id===defAff)?.name:''}${distMode==='ranges'?' | توزيع: '+rangeList.filter(r=>r.cc).map(r=>`${r.from}–${r.to} → ${ccName_(r.cc)}`).join('، '):(defCC?' | مسند لـ: '+ccName:'')}`;
     await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'استيراد أوردرات',entity:'orders',detail,created_at:now()});
     toast(`تم استيراد ${done} أوردر ✅${skipped?` (وتم تخطي ${skipped} موجودين مسبقاً)`:''}`,'success'); onClose();
   };
@@ -1367,7 +1391,7 @@ const ImportModal = ({user,affs,onClose}) => {
   };
 
   return <Modal show={true} onClose={onClose} title="📤 استيراد الأوردرات من Excel" size="md"
-    footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button>{step===2&&rows.length>0&&<button className="btn btn-primary" onClick={confirm} disabled={importing}>{importing?'⏳ جاري...':'✅ تأكيد الاستيراد ('+rows.length+')'}</button>}</>}>
+    footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button>{step===2&&rows.length>0&&<button className="btn btn-primary" onClick={confirm} disabled={importing||!!rangeErr}>{importing?'⏳ جاري...':'✅ تأكيد الاستيراد ('+rows.length+')'}</button>}</>}>
     {step===1?<>
       <div className={drag?'upload-zone drag-over':'upload-zone'} onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);handleFile(e.dataTransfer.files[0])}} onClick={()=>ref.current.click()}>
         <div style={{fontSize:36,marginBottom:12}}>📊</div>
@@ -1382,7 +1406,11 @@ const ImportModal = ({user,affs,onClose}) => {
         <div style={{flex:1,background:'var(--red-bg)',borderRadius:8,padding:12,textAlign:'center'}}><div style={{fontSize:22,fontWeight:800,color:'var(--red)'}}>{errs.length}</div><div style={{fontSize:11,color:'var(--text3)'}}>أخطاء</div></div>
       </div>
       {errs.length>0&&<div style={{background:'var(--red-bg)',borderRadius:8,padding:10,marginBottom:12,maxHeight:100,overflowY:'auto'}}>{errs.map((e,i)=><div key={i} style={{fontSize:11,color:'var(--red)',marginBottom:3}}>⚠️ {e}</div>)}</div>}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:4}}>
+      <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
+        <button className={`btn btn-sm ${distMode==='single'?'btn-primary':'btn-ghost'}`} onClick={()=>setDistMode('single')}>👤 موظف واحد للكل</button>
+        <button className={`btn btn-sm ${distMode==='ranges'?'btn-primary':'btn-ghost'}`} onClick={()=>setDistMode('ranges')}>🔢 توزيع بالنطاق (من أوردر رقم … إلى …)</button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:distMode==='single'?'1fr 1fr':'1fr',gap:10,marginBottom:4}}>
         <div className="form-group" style={{marginBottom:0}}>
           <label className="form-label">ربط بأفيلييت</label>
           <select className="input select" value={defAff} onChange={e=>setDefAff(e.target.value)}>
@@ -1390,23 +1418,47 @@ const ImportModal = ({user,affs,onClose}) => {
             {affs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
-        <div className="form-group" style={{marginBottom:0}}>
+        {distMode==='single'&&<div className="form-group" style={{marginBottom:0}}>
           <label className="form-label">توزيع على موظف كول سنتر</label>
           <select className="input select" value={defCC} onChange={e=>setDefCC(e.target.value)}>
             <option value="">اختياري — لا يُسند</option>
             {ccUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
-        </div>
+        </div>}
       </div>
-      {defCC&&<div style={{background:'var(--blue-bg)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:11,color:'var(--blue)'}}>
-        ✅ سيتم توزيع جميع الأوردرات على <strong>{ccUsers.find(u=>u.id===defCC)?.name}</strong> وتغيير حالتها إلى "مسند"
+      {distMode==='single'&&defCC&&<div style={{background:'var(--blue-bg)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:11,color:'var(--blue)'}}>
+        ✅ سيتم توزيع جميع الأوردرات على <strong>{ccName_(defCC)}</strong> وتغيير حالتها إلى "مسند"
       </div>}
-      <div style={{maxHeight:240,overflowY:'auto'}}>
-        {rows.slice(0,15).map(r=><div key={r.id} style={{background:'var(--bg3)',borderRadius:8,padding:9,marginBottom:7}}>
-          <div style={{fontWeight:600,color:'var(--text)',fontSize:12}}>{r.order_ref} — {r.customer_name}</div>
-          <div style={{color:'var(--text3)',fontSize:11}}>{r.customer_phone} · {r.city} · {fmtMoney(r.total_cost)}</div>
+      {distMode==='ranges'&&<div style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:10,padding:12,margin:'10px 0 12px'}}>
+        <div style={{fontSize:11,color:'var(--text3)',marginBottom:10,lineHeight:1.7}}>الترقيم حسب ترتيب الأوردرات الجديدة في الملف (من 1 إلى {total}). الأوردرات اللي برا أي نطاق بتفضل غير موزعة.</div>
+        {ranges.map((r,i)=><div key={i} style={{display:'flex',gap:6,alignItems:'center',marginBottom:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:11,color:'var(--text3)'}}>من</span>
+          <input className="input" type="number" min="1" style={{width:74}} value={r.from} onChange={e=>setRange(i,{from:e.target.value})}/>
+          <span style={{fontSize:11,color:'var(--text3)'}}>إلى</span>
+          <input className="input" type="number" min="1" style={{width:74}} value={r.to} onChange={e=>setRange(i,{to:e.target.value})}/>
+          <select className="input select" style={{flex:1,minWidth:120}} value={r.cc} onChange={e=>setRange(i,{cc:e.target.value})}>
+            <option value="">اختر الموظف</option>
+            {ccUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+          {ranges.length>1&&<button className="btn btn-ghost btn-sm" onClick={()=>setRanges(rs=>rs.filter((_,k)=>k!==i))}>✕</button>}
         </div>)}
-        {rows.length>15&&<div style={{fontSize:11,color:'var(--text3)',textAlign:'center',padding:'8px 0'}}>... و {rows.length-15} أوردر آخر</div>}
+        <button className="btn btn-ghost btn-sm" onClick={addRange}>➕ إضافة نطاق</button>
+        {rangeErr
+          ? <div style={{color:'var(--red)',fontSize:11,marginTop:8}}>⚠️ {rangeErr}</div>
+          : <div style={{color:'var(--blue)',fontSize:11,marginTop:10,lineHeight:1.8}}>
+              {rangeList.filter(r=>r.cc).map((r,i)=><div key={i}>✅ {r.from}–{r.to} ({r.to-r.from+1} أوردر) ← <strong>{ccName_(r.cc)}</strong></div>)}
+              {total-assignedCount>0&&<div style={{color:'var(--text3)'}}>⏳ {total-assignedCount} أوردر من غير توزيع</div>}
+            </div>}
+      </div>}
+      <div style={{maxHeight:260,overflowY:'auto'}}>
+        {rows.map((r,i)=>{const cc=assignIdx(i);return <div key={r.id} style={{background:'var(--bg3)',borderRadius:8,padding:9,marginBottom:7,display:'flex',gap:8,alignItems:'center'}}>
+          <span style={{fontSize:10,fontWeight:700,color:'var(--accent)',minWidth:28}}>#{i+1}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:600,color:'var(--text)',fontSize:12}}>{r.order_ref} — {r.customer_name}</div>
+            <div style={{color:'var(--text3)',fontSize:11}}>{r.customer_phone} · {r.city} · {fmtMoney(r.total_cost)}</div>
+          </div>
+          {cc&&<span className="chip" style={{fontSize:9,flexShrink:0}}>👤 {ccName_(cc)}</span>}
+        </div>;})}
       </div>
     </>}
   </Modal>;
@@ -1440,6 +1492,7 @@ const AddModal = ({user,affs,onClose}) => {
       <div className="form-group"><label className="form-label">اسم العميل *</label><input className="input" value={f.customer_name} onChange={e=>sf('customer_name',e.target.value)}/></div>
       <div className="form-group"><label className="form-label">التليفون</label><input className="input" value={f.customer_phone} onChange={e=>sf('customer_phone',e.target.value)}/></div>
       <div className="form-group"><label className="form-label">المحافظة</label><input className="input" value={f.city} onChange={e=>sf('city',e.target.value)}/></div>
+      <div className="form-group"><label className="form-label">المنطقة</label><input className="input" value={f.area||''} onChange={e=>sf('area',e.target.value)}/></div>
       <div className="form-group"><label className="form-label">تليفون بديل</label><input className="input" value={f.customer_alt_phone} onChange={e=>sf('customer_alt_phone',e.target.value)}/></div>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label className="form-label">العنوان</label><input className="input" value={f.customer_address} onChange={e=>sf('customer_address',e.target.value)}/></div>
       <div className="form-group" style={{gridColumn:'1/-1'}}><label className="form-label">اسم المنتج</label><input className="input" value={f.product_name} onChange={e=>sf('product_name',e.target.value)}/></div>
@@ -1546,8 +1599,9 @@ const BulkStatusModal = ({orders:sel,allowed,user,onClose}) => {
 const exportConfirmedOrders = (orders, affiliates, dupMap={}, fileLabel='confirmed_orders') => {
   if(!orders||orders.length===0){toast(fileLabel==='confirmed_orders'?'لا توجد أوردرات مؤكدة للتصدير':'حدد أوردرات للتصدير الأول','error');return;}
   const days_ar = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  // تاريخ يوم السبت بتاع الأسبوع الحالي (الأسبوع بيبدأ سبت) وقت التصدير
+  const sat = new Date(); sat.setHours(12,0,0,0); sat.setDate(sat.getDate()-((sat.getDay()+1)%7));
   const rows = orders.map((o,i) => {
-    const d = new Date(o.created_at||new Date());
     const aff = affiliates.find(a=>a.id===o.affiliate_id);
     // Parse products - support multiple if product_name has pipe separator or just use main product
     const products = o.product_name ? o.product_name.split('|') : [o.product_name||''];
@@ -1560,15 +1614,15 @@ const exportConfirmedOrders = (orders, affiliates, dupMap={}, fileLabel='confirm
       'المحمول': o.customer_phone||'',
       'التليفون': o.customer_alt_phone||'',
       'المحافظة': o.city||'',
-      'المنطقة': '',
+      'المنطقة': o.area||'',
       '': o.city||'',
       ' ': 0,
       '  ': '',
       'العنوان': o.customer_address||'',
-      'اليوم': days_ar[d.getDay()],
-      'التاريخ': d.getDate(),
-      'الشهر': d.getMonth()+1,
-      'السنة': d.getFullYear(),
+      'اليوم': days_ar[sat.getDay()],
+      'التاريخ': sat.getDate(),
+      'الشهر': sat.getMonth()+1,
+      'السنة': sat.getFullYear(),
       'معاد التسليم': 'خلال يومين',
       'منتج 1': getP(products,0),
       'كمية 1': getP(qtys,0)||1,
@@ -1735,7 +1789,7 @@ const ShippingPage = ({user}) => {
               {o.product_name&&<div style={{fontSize:12,color:'var(--text2)',marginBottom:10}}>📦 {o.product_name} ×{o.quantity||1}</div>}
               <div style={{display:'flex',gap:8,marginBottom:10}}>
                 <a href={`tel:${o.customer_phone}`} onClick={()=>logContact(o.id,'call',user)} className="btn btn-success btn-sm" style={{flex:1,justifyContent:'center',textDecoration:'none'}}>📞 اتصال</a>
-                <a href={`https://wa.me/${intlPhone}?text=${encodeURIComponent('مرحباً '+o.customer_name+'، بخصوص طلبكم رقم '+o.order_ref)}`} target="_blank" rel="noreferrer" onClick={()=>logContact(o.id,'whatsapp',user)} className="btn btn-sm" style={{flex:1,justifyContent:'center',background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
+                <a href={`https://wa.me/${intlPhone}?text=${encodeURIComponent(waText(o.customer_name))}`} target="_blank" rel="noreferrer" onClick={()=>logContact(o.id,'whatsapp',user)} className="btn btn-sm" style={{flex:1,justifyContent:'center',background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
                 <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={()=>setPrint([o])}>🖨️</button>
               </div>
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
