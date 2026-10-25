@@ -112,6 +112,8 @@ td.bold{color:var(--text);font-weight:600}
 .badge-not_delivered{background:var(--red-bg);color:var(--red)}
 .badge-no_answer_1{background:var(--yellow-bg);color:var(--yellow)}
 .badge-no_answer_2{background:var(--orange-bg);color:var(--orange)}
+.badge-postponed{background:var(--purple-bg);color:var(--purple)}
+.box{min-width:0;max-width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
 .badge-paid{background:var(--green-bg);color:var(--green)}
 .badge-unpaid{background:var(--yellow-bg);color:var(--yellow)}
 .input{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;outline:none;transition:border-color .15s;width:100%}
@@ -262,7 +264,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.10.14-import-ranges';
+const APP_VERSION = '2026.10.25-followups';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = localStorage.getItem('crm_t')||'';
@@ -284,8 +286,8 @@ const fmtShort = d => d ? new Date(d).toLocaleDateString('ar-EG',{month:'short',
 const fmtMoney = n => n!=null ? Number(n).toLocaleString('ar-EG')+' ج' : '-';
 const fmtPrint = () => new Date().toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
 
-const SL = {new:'جديد',pending:'معلق',assigned:'مسند',confirmed:'مؤكد',cancelled:'ملغي',follow_up:'متابعة',shipped:'خرج للشحن',delivered:'تم التسليم',not_delivered:'لم يتسلم',no_answer_1:'لم يرد 1',no_answer_2:'لم يرد 2'};
-const SC = {new:'badge-new',pending:'badge-pending',assigned:'badge-assigned',confirmed:'badge-confirmed',cancelled:'badge-cancelled',follow_up:'badge-follow_up',shipped:'badge-shipped',delivered:'badge-delivered',not_delivered:'badge-not_delivered',no_answer_1:'badge-no_answer_1',no_answer_2:'badge-no_answer_2'};
+const SL = {new:'جديد',pending:'معلق',assigned:'مسند',confirmed:'مؤكد',cancelled:'ملغي',follow_up:'متابعة',postponed:'مؤجل',shipped:'خرج للشحن',delivered:'تم التسليم',not_delivered:'لم يتسلم',no_answer_1:'لم يرد 1',no_answer_2:'لم يرد 2'};
+const SC = {new:'badge-new',pending:'badge-pending',assigned:'badge-assigned',confirmed:'badge-confirmed',cancelled:'badge-cancelled',follow_up:'badge-follow_up',postponed:'badge-postponed',shipped:'badge-shipped',delivered:'badge-delivered',not_delivered:'badge-not_delivered',no_answer_1:'badge-no_answer_1',no_answer_2:'badge-no_answer_2'};
 const RL = {admin:'أدمن',call_center:'كول سنتر',shipping:'شحن'};
 const EXCEL_MAP = {'ID':'order_ref','Status':'status','FullName':'customer_name','Phone':'customer_phone','Alt Phone':'customer_alt_phone','City':'city','Address':'customer_address','Total Cost':'total_cost','Product Cost':'product_cost','Shipping Cost':'shipping_cost','Coupon':'coupon','Coupon Discount':'coupon_discount','Product Name':'product_name','Variant':'variant','Quantity':'quantity','SKU':'sku','Item Price':'item_price','Utm Source':'source','Utm Campaign':'utm_campaign','Payment Method':'payment_method','Note':'note','Ref':'referral_code','Order ID':'external_id','External Order ID':'external_id'};
 
@@ -370,7 +372,7 @@ const DupBadge = ({d,full}) => {
   return <div title={tip} style={{marginTop:3,fontSize:9,fontWeight:700,color:'var(--orange)',whiteSpace:'nowrap'}}>🔁 مكرر · {w.rel}{more}</div>;
 };
 /* ═══ تاريخ حياة الأوردر + تتبع الاتصال والواتساب + إحصائيات اليوم ═══ */
-const FIELD_LABELS = {customer_name:'الاسم',customer_phone:'الموبايل',customer_alt_phone:'التليفون البديل',city:'المحافظة',area:'المنطقة',customer_address:'العنوان',product_name:'المنتج',variant:'النوع',sku:'SKU',quantity:'الكمية',item_price:'سعر الوحدة',total_cost:'الإجمالي',product_cost:'تكلفة المنتج',shipping_cost:'الشحن',coupon:'الكوبون',coupon_discount:'خصم الكوبون',discount:'الخصم',source:'المصدر',utm_campaign:'الحملة',payment_method:'طريقة الدفع',note:'الملاحظة',referral_code:'كود الإحالة',affiliate_id:'الأفيليت',external_id:'الرقم الخارجي',order_ref:'رقم الأوردر'};
+const FIELD_LABELS = {customer_name:'الاسم',customer_phone:'الموبايل',customer_alt_phone:'التليفون البديل',city:'المحافظة',area:'المنطقة',customer_address:'العنوان',product_name:'المنتج',variant:'النوع',sku:'SKU',quantity:'الكمية',item_price:'سعر الوحدة',total_cost:'الإجمالي',product_cost:'تكلفة المنتج',shipping_cost:'الشحن',coupon:'الكوبون',coupon_discount:'خصم الكوبون',discount:'الخصم',source:'المصدر',utm_campaign:'الحملة',payment_method:'طريقة الدفع',note:'الملاحظة',referral_code:'كود الإحالة',affiliate_id:'الأفيليت',external_id:'الرقم الخارجي',order_ref:'رقم الأوردر',follow_up_at:'ميعاد المتابعة',cancel_reason:'سبب الإلغاء',cancel_note:'ملاحظة الإلغاء'};
 const logContact = (orderId,type,user,extra) => { sb.from('order_events').insert({order_id:orderId,type,user_id:user.id,user_name:user.name,...(extra?{changes:extra}:{})}).then(()=>{},()=>{}); };
 
 const ContactSummary = ({events}) => {
@@ -396,7 +398,7 @@ const OrderTimeline = ({order,events,users,affs}) => {
   if(sep) rows.push({k:'created',at:createdEv.created_at,icon:'📥',color:'var(--blue)',user:null,body:<><b>اتضاف للسيستم</b>{by(createdEv.user_name)}</>});
   list.forEach(e=>{
     if(e.type==='created'||e.type==='call'||e.type==='whatsapp') return;
-    if(e.type==='status') rows.push({k:e.id,at:e.created_at,icon:'🔄',color:'var(--orange)',user:e.user_name,body:<span style={{display:'inline-flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><b>غيّر الحالة</b>{e.from_status&&<SBadge status={e.from_status}/>}<span>←</span><SBadge status={e.to_status}/></span>});
+    if(e.type==='status') rows.push({k:e.id,at:e.created_at,icon:'🔄',color:'var(--orange)',user:e.user_name,body:<span style={{display:'inline-flex',alignItems:'center',gap:6,flexWrap:'wrap'}}><b>غيّر الحالة</b>{e.from_status&&<SBadge status={e.from_status}/>}<span>←</span><SBadge status={e.to_status}/>{e.changes&&e.changes.follow_up_at&&<span style={{width:'100%',fontSize:11,color:'var(--purple)'}}>⏰ ميعاد المتابعة: {fmtFollow(e.changes.follow_up_at)}</span>}{e.changes&&e.changes.cancel_reason&&<span style={{width:'100%',fontSize:11,color:'var(--red)'}}>🚫 السبب: {cancelLabel(e.changes)}</span>}</span>});
     else if(e.type==='assign'){const c=e.changes?.assigned_to||{};rows.push({k:e.id,at:e.created_at,icon:'📋',color:'var(--purple)',user:e.user_name,body:<><b>وزّع الأوردر على {nameU(c.new)}</b>{c.old&&<span style={{color:'var(--text3)'}}> (كان: {nameU(c.old)})</span>}</>});}
     else if(e.type==='edit') rows.push({k:e.id,at:e.created_at,icon:'✏️',color:'var(--yellow)',user:e.user_name,body:<><b>عدّل البيانات</b>{Object.entries(e.changes||{}).map(([k,v])=><div key={k} style={{fontSize:11,color:'var(--text2)',marginTop:3}}><span style={{color:'var(--text3)'}}>{FIELD_LABELS[k]||k}:</span> {fv(k,v.old)} <span style={{color:'var(--text3)'}}>←</span> <b>{fv(k,v.new)}</b></div>)}</>});
   });
@@ -508,7 +510,7 @@ const useInstall = () => {
   return {canInstall:!standalone&&(!!evt||ios), install};
 };
 /* ═══ مين أونلاين؟ — نبضات من التطبيق + عرض للأدمن ═══ */
-const PAGE_LABELS = {dashboard:'لوحة التحكم',orders:'الأوردرات',shipping:'قسم الشحن',affiliates:'الأفيليتس',commissions:'العمولات',users:'المستخدمون',audit:'سجل النشاطات'};
+const PAGE_LABELS = {dashboard:'لوحة التحكم',orders:'الأوردرات',shipping:'قسم الشحن',affiliates:'الأفيليتس',commissions:'العمولات',users:'المستخدمون',audit:'سجل النشاطات',followups:'مطلوب متابعة',cancellations:'الإلغاءات'};
 const PRESENCE = {
   online:{icon:'🟢',label:'نشط الآن',color:'var(--green)'},
   idle:{icon:'🟡',label:'فاتح الصفحة (خامل)',color:'var(--yellow)'},
@@ -585,8 +587,442 @@ const PresenceCard = ({me}) => {
   </div>;
 };
 const waText = name => `مساء الخير يا أ/ ${name}، مع حضرتك شركة Dark Store بنكلم حضرتك بخصوص أوردر مشد البطن، ممكن الوزن؟ و حضرتك عايزة اللون الأسود ولا البيج؟`;
+/* ═══ مؤجل (متابعة بميعاد) + أسباب الإلغاء + صفحات المتابعة والإلغاءات + أداء الكول سنتر ═══ */
+const CANCEL_REASONS = {wrong_number:'الرقم غلط',changed_mind:'غيّر رأيه',no_order:'الرقم صح وماطلبش حاجة',other:'سبب آخر'};
+const cancelLabel = o => !o||!o.cancel_reason ? 'غير محدد' : o.cancel_reason==='other' ? (o.cancel_note?`سبب آخر: ${o.cancel_note}`:'سبب آخر') : (CANCEL_REASONS[o.cancel_reason]||o.cancel_reason);
+const toLocalInput = d => { const x=new Date(d); x.setMinutes(x.getMinutes()-x.getTimezoneOffset()); return x.toISOString().slice(0,16); };
+const at11 = days => { const d=new Date(); d.setDate(d.getDate()+days); d.setHours(11,0,0,0); return d; };
+const fmtFollow = iso => iso ? new Date(iso).toLocaleString('ar-EG',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}) : 'من غير ميعاد';
+const fmtTime = iso => iso ? new Date(iso).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : '';
+const dayKeyOf = iso => iso ? localISODate(new Date(iso)) : 'none';
+const fmtMin = m => m==null ? '—' : m<60 ? `${m} د` : `${(m/60).toFixed(1)} س`;
+
+const PostponeFields = ({value,onChange}) => {
+  const pick = fn => onChange(toLocalInput(fn()));
+  return <div>
+    <label className="form-label">📅 ميعاد المتابعة مع العميل</label>
+    <input type="datetime-local" className="input" value={value} min={toLocalInput(new Date())} onChange={e=>onChange(e.target.value)}/>
+    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:8}}>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>pick(()=>new Date(Date.now()+2*3600e3))}>بعد ساعتين</button>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>pick(()=>at11(1))}>بكرة 11 ص</button>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>pick(()=>at11(3))}>بعد 3 أيام</button>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={()=>pick(()=>at11(7))}>بعد أسبوع</button>
+    </div>
+  </div>;
+};
+
+const CancelFields = ({reason,note,setReason,setNote}) => <div>
+  <label className="form-label">🚫 سبب الإلغاء</label>
+  <div style={{display:'grid',gap:6}}>
+    {Object.entries(CANCEL_REASONS).map(([k,v])=><label key={k} style={{display:'flex',alignItems:'center',gap:8,background:reason===k?'var(--red-bg)':'var(--bg3)',border:`1px solid ${reason===k?'var(--red)':'var(--border)'}`,borderRadius:8,padding:'9px 11px',cursor:'pointer',fontSize:12,color:'var(--text)'}}>
+      <input type="radio" name="cancel_reason" checked={reason===k} onChange={()=>setReason(k)}/>{v}
+    </label>)}
+  </div>
+  {reason==='other'&&<textarea className="input" rows={3} style={{marginTop:8}} placeholder="اكتب السبب..." value={note} onChange={e=>setNote(e.target.value)} autoFocus/>}
+</div>;
+
+// تحديث حالة أوردر/أكتر مرة واحدة (مع الميعاد أو السبب) + سجل النشاطات
+const applyStatus = async (targets,status,extra,user,label) => {
+  const updated=[];
+  const patch={status,updated_at:now(),status_updated_at:now(),...(extra||{})};
+  for(let i=0;i<targets.length;i+=100){
+    const chunk=targets.slice(i,i+100);
+    const {data,error}=await sb.from('orders').update(patch).in('id',chunk.map(o=>o.id)).select('id');
+    if(error){toast('حدث خطأ: '+error.message,'error');break;}
+    const ok=new Set((data||[]).map(r=>r.id));
+    chunk.forEach(o=>ok.has(o.id)&&updated.push(o));
+  }
+  if(updated.length){
+    const extraTxt = status==='postponed'&&extra&&extra.follow_up_at ? ` (متابعة: ${fmtFollow(extra.follow_up_at)})` : status==='cancelled' ? ` (السبب: ${cancelLabel(extra)})` : '';
+    const refs=updated.slice(0,15).map(o=>o.order_ref).join('، ')+(updated.length>15?` … (+${updated.length-15})`:'');
+    const detail = updated.length===1 ? `${updated[0].order_ref}: ${SL[updated[0].status]} → ${SL[status]}${extraTxt}` : `${updated.length} أوردر → ${SL[status]}${extraTxt}: ${refs}`;
+    await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:label||(updated.length>1?'تحديث حالة bulk':'تحديث حالة'),entity:'orders',detail,created_at:now()});
+  }
+  return updated;
+};
+
+const PostponeModal = ({orders:list,user,onClose}) => {
+  const [when,setWhen] = useState(()=>list[0]&&list[0].follow_up_at?toLocalInput(list[0].follow_up_at):toLocalInput(at11(1)));
+  const [note,setNote] = useState('');
+  const [saving,setSaving] = useState(false);
+  const go = async () => {
+    if(!when){toast('اختر ميعاد المتابعة','error');return;}
+    const iso=new Date(when).toISOString();
+    setSaving(true);
+    const done=await applyStatus(list,'postponed',{follow_up_at:iso},user,list.every(o=>o.status==='postponed')?'تغيير ميعاد متابعة':undefined);
+    if(done.length&&note.trim()) await sb.from('order_notes').insert(done.map(o=>({id:uid(),order_id:o.id,user_id:user.id,user_name:user.name,note:`⏰ تأجيل لـ ${fmtFollow(iso)} — ${note.trim()}`,created_at:now()})));
+    toast(done.length?`تم التأجيل — المتابعة ${fmtFollow(iso)}`:'محصلش تحديث','success');
+    setSaving(false); onClose(done.length>0);
+  };
+  return <Modal show={true} onClose={()=>onClose(false)} title={list.length>1?`⏰ تأجيل ${list.length} أوردر`:`⏰ تأجيل أوردر ${list[0].order_ref}`} size="sm"
+    footer={<><button className="btn btn-ghost" onClick={()=>onClose(false)}>إلغاء</button><button className="btn btn-primary" onClick={go} disabled={saving||!when}>{saving?'⏳ جاري الحفظ...':'تأجيل'}</button></>}>
+    <PostponeFields value={when} onChange={setWhen}/>
+    <div className="form-group" style={{marginTop:14,marginBottom:0}}><label className="form-label">ملاحظة (اختياري)</label>
+      <input className="input" value={note} onChange={e=>setNote(e.target.value)} placeholder="مثلًا: العميل مسافر ويرجع الخميس"/></div>
+  </Modal>;
+};
+
+const CancelModal = ({orders:list,user,onClose}) => {
+  const [reason,setReason] = useState('');
+  const [note,setNote] = useState('');
+  const [saving,setSaving] = useState(false);
+  const go = async () => {
+    if(!reason){toast('اختر سبب الإلغاء','error');return;}
+    if(reason==='other'&&note.trim().length<2){toast('اكتب السبب','error');return;}
+    setSaving(true);
+    const done=await applyStatus(list,'cancelled',{cancel_reason:reason,cancel_note:reason==='other'?note.trim():null},user);
+    if(done.length) toast(`تم إلغاء ${done.length} أوردر`,'success');
+    setSaving(false); onClose(done.length>0);
+  };
+  return <Modal show={true} onClose={()=>onClose(false)} title={list.length>1?`🚫 إلغاء ${list.length} أوردر`:`🚫 إلغاء أوردر ${list[0].order_ref}`} size="sm"
+    footer={<><button className="btn btn-ghost" onClick={()=>onClose(false)}>رجوع</button><button className="btn btn-danger" onClick={go} disabled={saving||!reason}>{saving?'⏳ جاري الحفظ...':'تأكيد الإلغاء'}</button></>}>
+    <CancelFields reason={reason} note={note} setReason={setReason} setNote={setNote}/>
+  </Modal>;
+};
+
+// تغيير حالة بنفس القواعد في أي صفحة: مؤجل بيفتح التقويم، وملغي بيطلب السبب
+const useStatusActions = (user,find,reload,afterModalDone) => {
+  const [pp,setPP] = useState(null);
+  const [cc,setCC] = useState(null);
+  const doStatus = async (id,status) => {
+    const o=find(id); if(!o) return;
+    if(status==='postponed'){setPP([o]);return;}
+    if(status==='cancelled'){setCC([o]);return;}
+    const done=await applyStatus([o],status,null,user);
+    if(done.length) toast(`تم التحديث إلى "${SL[status]}"`,'success');
+    reload();
+  };
+  const node = <>
+    {pp&&<PostponeModal orders={pp} user={user} onClose={done=>{setPP(null);if(done&&afterModalDone)afterModalDone();reload();}}/>}
+    {cc&&<CancelModal orders={cc} user={user} onClose={done=>{setCC(null);if(done&&afterModalDone)afterModalDone();reload();}}/>}
+  </>;
+  return {doStatus,node,openPostpone:o=>setPP([o]),openCancel:o=>setCC([o])};
+};
+
+const WEEK_AR = ['سبت','أحد','اثنين','ثلاثاء','أربعاء','خميس','جمعة'];
+const fetchAllRows = async (build) => {
+  const all=[]; let i=0;
+  for(;;){
+    const {data,error}=await build().range(i,i+999);
+    if(error||!data) break;
+    all.push(...data); if(data.length<1000) break; i+=1000;
+  }
+  return all;
+};
+
+/* ───────── صفحة: مطلوب متابعة (تقويم المؤجل) ───────── */
+const FuCard = ({o,user,agentName,onDetail,doStatus,onPostpone,onCancel}) => {
+  const late = o.follow_up_at && new Date(o.follow_up_at) < new Date();
+  const raw=(o.customer_phone||'').replace(/\D/g,''); const intl=raw.startsWith('0')?'2'+raw:raw;
+  return <div style={{background:'var(--bg2)',border:`1px solid ${late?'var(--red)':'var(--border)'}`,borderRadius:12,padding:12,marginBottom:10}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+      <span style={{fontWeight:700,fontSize:12,color:late?'var(--red)':'var(--purple)'}}>{o.follow_up_at?`⏰ ${fmtTime(o.follow_up_at)}${late?' — فات ميعادها':''}`:'⏰ من غير ميعاد'}</span>
+      <span style={{fontSize:11,color:'var(--text3)'}}>#{o.order_ref}{agentName?` · 👤 ${agentName}`:''}</span>
+    </div>
+    <div style={{marginTop:6,fontWeight:700,color:'var(--text)'}}>{o.customer_name}</div>
+    <div style={{fontSize:11,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div>
+    <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>📍 {o.city||'-'}{o.area?` — ${o.area}`:''} · 📦 {o.product_name||'-'}</div>
+    {late&&<div style={{fontSize:10,color:'var(--red)',marginTop:2}}>كان مفروض: {fmtFollow(o.follow_up_at)}</div>}
+    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:10}}>
+      <a href={`tel:${o.customer_phone}`} onClick={()=>logContact(o.id,'call',user)} className="btn btn-success btn-sm" style={{textDecoration:'none'}}>📞 اتصال</a>
+      <a href={`https://wa.me/${intl}?text=${encodeURIComponent(waText(o.customer_name))}`} target="_blank" rel="noreferrer" onClick={()=>logContact(o.id,'whatsapp',user)} className="btn btn-sm" style={{background:'#25D366',color:'#fff',textDecoration:'none'}}>💬 واتساب</a>
+      <button className="btn btn-primary btn-sm" onClick={()=>doStatus(o.id,'confirmed')}>✅ تأكيد</button>
+      <button className="btn btn-ghost btn-sm" onClick={()=>onPostpone(o)}>🔁 تأجيل تاني</button>
+      <button className="btn btn-danger btn-sm" onClick={()=>onCancel(o)}>❌ إلغاء</button>
+      <button className="btn btn-ghost btn-sm" onClick={()=>onDetail(o)}>👁️ تفاصيل</button>
+    </div>
+  </div>;
+};
+
+const FollowUpsPage = ({user}) => {
+  const today = localISODate(new Date());
+  const [orders,setOrders] = useState([]);
+  const [affs,setAffs] = useState([]);
+  const [users,setUsers] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [sel,setSel] = useState(today);
+  const [month,setMonth] = useState(()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1);});
+  const [fAgent,setFAgent] = useState('');
+  const [detail,setDetail] = useState(null);
+  const load = useCallback(async()=>{
+    const rows=await fetchAllRows(()=>sb.from('orders').select('*').eq('status','postponed').order('follow_up_at',{ascending:true,nullsFirst:true}).order('id'));
+    const [a,u]=await Promise.all([sb.from('affiliates').select('*'),sb.from('users').select(USER_COLS)]);
+    setOrders(rows); setAffs(a.data||[]); setUsers(u.data||[]); setLoading(false);
+  },[]);
+  useEffect(()=>{load();},[load]);
+  const {doStatus,node,openPostpone,openCancel} = useStatusActions(user,id=>orders.find(x=>x.id===id),load,()=>setDetail(null));
+
+  const list = orders.filter(o=>!fAgent||o.assigned_to===fAgent);
+  const byDay = {}; list.forEach(o=>{const k=dayKeyOf(o.follow_up_at);byDay[k]=(byDay[k]||0)+1;});
+  const noDate = list.filter(o=>!o.follow_up_at);
+  const overdue = list.filter(o=>o.follow_up_at&&dayKeyOf(o.follow_up_at)<today);
+  const dayList = list.filter(o=>o.follow_up_at&&dayKeyOf(o.follow_up_at)===sel).sort((a,b)=>new Date(a.follow_up_at)-new Date(b.follow_up_at));
+  const upcoming = list.filter(o=>o.follow_up_at&&dayKeyOf(o.follow_up_at)>today).length;
+  const todayCount = byDay[today]||0;
+
+  const y=month.getFullYear(), m=month.getMonth();
+  const lead=(new Date(y,m,1).getDay()+1)%7;                 // الأسبوع بيبدأ سبت
+  const dim=new Date(y,m+1,0).getDate();
+  const cells=[...Array(lead).fill(null),...Array.from({length:dim},(_,i)=>i+1)];
+  const keyOf=d=>`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const ccUsers = users.filter(u=>u.role==='call_center');
+  const nameOf = id => (users.find(u=>u.id===id)||{}).name;
+  const cardProps = o => ({key:o.id,o,user,agentName:user.role==='admin'?nameOf(o.assigned_to):null,onDetail:setDetail,doStatus,onPostpone:openPostpone,onCancel:openCancel});
+
+  if(loading) return <div className="page"><Loading/></div>;
+  return <div className="page">
+    <div className="page-header"><div><div className="page-title">⏰ مطلوب متابعة</div><div className="page-sub">الأوردرات المؤجلة وميعاد متابعة كل واحد — بتتشال من هنا أول ما حالتها تتغير</div></div>
+      {user.role==='admin'&&<select className="input select" style={{minWidth:160}} value={fAgent} onChange={e=>setFAgent(e.target.value)}><option value="">كل الموظفين</option>{ccUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select>}
+    </div>
+    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
+      <span className="chip" style={{fontSize:11,color:'var(--purple)',borderColor:'var(--purple)'}}>⏰ النهاردة: {todayCount}</span>
+      <span className="chip" style={{fontSize:11,color:overdue.length?'var(--red)':'var(--text3)',borderColor:overdue.length?'var(--red)':undefined}}>🔴 متأخرة: {overdue.length}</span>
+      <span className="chip" style={{fontSize:11}}>📆 الجاية: {upcoming}</span>
+      {noDate.length>0&&<span className="chip" style={{fontSize:11,color:'var(--yellow)'}}>⚠️ من غير ميعاد: {noDate.length}</span>}
+    </div>
+    <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-start'}}>
+      <div style={{flex:'0 0 310px',maxWidth:'100%',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:12}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setMonth(new Date(y,m-1,1))}>›</button>
+          <div style={{fontWeight:700,fontSize:13,color:'var(--text)'}}>{month.toLocaleDateString('ar-EG',{month:'long',year:'numeric'})}</div>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setMonth(new Date(y,m+1,1))}>‹</button>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,textAlign:'center'}}>
+          {WEEK_AR.map(d=><div key={d} style={{fontSize:9,color:'var(--text3)',padding:'2px 0'}}>{d}</div>)}
+          {cells.map((d,i)=>{ if(!d) return <div key={'e'+i}/>;
+            const k=keyOf(d), n=byDay[k]||0, isSel=k===sel, isToday=k===today;
+            return <button key={k} onClick={()=>setSel(k)} style={{position:'relative',height:38,borderRadius:8,border:`1px solid ${isSel?'var(--accent)':isToday?'var(--purple)':'var(--border)'}`,background:isSel?'var(--accent)':'var(--bg3)',color:isSel?'#fff':'var(--text)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+              {d}{n>0&&<span style={{position:'absolute',top:1,left:2,minWidth:15,height:15,borderRadius:8,background:k<today?'var(--red)':'var(--green)',color:'#fff',fontSize:9,fontWeight:700,lineHeight:'15px',padding:'0 3px'}}>{n}</span>}
+            </button>; })}
+        </div>
+        <div style={{display:'flex',gap:6,marginTop:10}}>
+          <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center'}} onClick={()=>{setSel(today);setMonth(new Date(new Date().getFullYear(),new Date().getMonth(),1));}}>النهاردة</button>
+        </div>
+      </div>
+      <div style={{flex:'1 1 320px',minWidth:0}}>
+        {noDate.length>0&&<><div style={{fontSize:12,fontWeight:700,color:'var(--yellow)',margin:'0 0 8px'}}>⚠️ مؤجلة من غير ميعاد ({noDate.length})</div>{noDate.map(o=><FuCard {...cardProps(o)}/>)}</>}
+        {sel===today&&overdue.length>0&&<><div style={{fontSize:12,fontWeight:700,color:'var(--red)',margin:'4px 0 8px'}}>🔴 متأخرة من أيام فاتت ({overdue.length})</div>{overdue.map(o=><FuCard {...cardProps(o)}/>)}</>}
+        <div style={{fontSize:12,fontWeight:700,color:'var(--text)',margin:'4px 0 8px'}}>📅 {new Date(sel+'T00:00:00').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long'})} ({dayList.length})</div>
+        {dayList.length===0
+          ? <div style={{textAlign:'center',color:'var(--text3)',fontSize:12,padding:'30px 0',background:'var(--bg2)',border:'1px dashed var(--border)',borderRadius:12}}>مفيش متابعات في اليوم ده 🎉</div>
+          : dayList.map(o=><FuCard {...cardProps(o)}/>)}
+      </div>
+    </div>
+    {detail&&<DetailModal order={detail} user={user} affs={affs} users={users} doStatus={doStatus} onClose={()=>{setDetail(null);load();}}/>}
+    {node}
+  </div>;
+};
+
+/* ───────── صفحة: الإلغاءات (أدمن) ───────── */
+const CancellationsPage = ({user}) => {
+  const [orders,setOrders] = useState([]);
+  const [affs,setAffs] = useState([]);
+  const [users,setUsers] = useState([]);
+  const [loading,setLoading] = useState(true);
+  const [q,setQ] = useState('');
+  const [fReason,setFReason] = useState('');
+  const [fAgent,setFAgent] = useState('');
+  const [fAff,setFAff] = useState('');
+  const [from,setFrom] = useState('');
+  const [to,setTo] = useState('');
+  const [page,setPage] = useState(1);
+  const [detail,setDetail] = useState(null);
+  const [showNotes,setShowNotes] = useState(false);
+  const load = useCallback(async()=>{
+    const rows=await fetchAllRows(()=>sb.from('orders').select('*').eq('status','cancelled').order('status_updated_at',{ascending:false,nullsFirst:false}).order('id'));
+    const [a,u]=await Promise.all([sb.from('affiliates').select('*'),sb.from('users').select(USER_COLS)]);
+    setOrders(rows); setAffs(a.data||[]); setUsers(u.data||[]); setLoading(false);
+  },[]);
+  useEffect(()=>{load();},[load]);
+  const {doStatus,node} = useStatusActions(user,id=>orders.find(x=>x.id===id),load,()=>setDetail(null));
+  const cdate = o => o.status_updated_at||o.updated_at||o.created_at;
+  const nameOf = id => (users.find(u=>u.id===id)||{}).name||'—';
+  const affName = id => (affs.find(a=>a.id===id)||{}).name||'';
+
+  const rows = orders.filter(o=>{
+    if(q){const t=q.toLowerCase(); if(!((o.customer_name||'').toLowerCase().includes(t)||(o.customer_phone||'').includes(t)||(o.order_ref||'').toLowerCase().includes(t))) return false;}
+    if(fReason==='none'){ if(o.cancel_reason) return false; } else if(fReason&&o.cancel_reason!==fReason) return false;
+    if(fAgent&&o.assigned_to!==fAgent) return false;
+    if(fAff&&o.affiliate_id!==fAff) return false;
+    const d=localISODate(new Date(cdate(o)));
+    if(from&&d<from) return false;
+    if(to&&d>to) return false;
+    return true;
+  });
+  const total = rows.length;
+  const reasonKeys = [...Object.keys(CANCEL_REASONS),'none'];
+  const cnt = k => rows.filter(o=>k==='none'?!o.cancel_reason:o.cancel_reason===k).length;
+  const pct = n => total?(n/total*100).toFixed(1):'0.0';
+  const rColor = {wrong_number:'var(--orange)',changed_mind:'var(--blue)',no_order:'var(--purple)',other:'var(--yellow)',none:'var(--text3)'};
+  const notes = {}; rows.filter(o=>o.cancel_reason==='other'&&o.cancel_note).forEach(o=>{notes[o.cancel_note]=(notes[o.cancel_note]||0)+1;});
+  const noteList = Object.entries(notes).sort((a,b)=>b[1]-a[1]);
+  const ps=DEFAULT_PS, paged = rows.slice((page-1)*ps,page*ps);
+  const ccUsers = users.filter(u=>u.role==='call_center');
+  const filtersOn = q||fReason||fAgent||fAff||from||to;
+
+  const exportRows = () => {
+    if(!rows.length){toast('مفيش أوردرات للتصدير','error');return;}
+    const data=rows.map(o=>({'رقم الأوردر':o.order_ref,'العميل':o.customer_name,'الموبايل':o.customer_phone,'المحافظة':o.city||'','المنتج':o.product_name||'','الموظف':nameOf(o.assigned_to),'الأفيليت':affName(o.affiliate_id),'سبب الإلغاء':o.cancel_reason?CANCEL_REASONS[o.cancel_reason]:'غير محدد','ملاحظة السبب':o.cancel_note||'','تاريخ الإلغاء':fmtDate(cdate(o)),'تاريخ الأوردر':fmtDate(o.created_at)}));
+    const ws=XLSX.utils.json_to_sheet(data); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'الإلغاءات');
+    XLSX.writeFile(wb,`cancellations_${localISODate(new Date())}.xlsx`);
+  };
+
+  if(loading) return <div className="page"><Loading/></div>;
+  return <div className="page">
+    <div className="page-header"><div><div className="page-title">🚫 الإلغاءات</div><div className="page-sub">{orders.length} أوردر ملغي إجمالًا — {total} بعد الفلتر</div></div>
+      <button className="btn btn-ghost" onClick={exportRows}>📤 تصدير ({total})</button></div>
+
+    <div className="box" style={{padding:16,marginBottom:14}}>
+      <div style={{fontSize:13,fontWeight:700,color:'var(--text)',marginBottom:12}}>📊 أسباب الإلغاء <span style={{fontWeight:400,color:'var(--text3)',fontSize:11}}>(نسبة كل سبب من {total} إلغاء)</span></div>
+      {total===0?<div style={{fontSize:12,color:'var(--text3)'}}>مفيش إلغاءات بالفلتر ده</div>:<div style={{display:'grid',gap:10}}>
+        {reasonKeys.filter(k=>k!=='none'||cnt('none')>0).map(k=>{const n=cnt(k);return <div key={k} onClick={()=>{setFReason(fReason===k?'':k);setPage(1);}} style={{cursor:'pointer',opacity:fReason&&fReason!==k?.45:1}}>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4,color:'var(--text)'}}><span>{k==='none'?'غير محدد (إلغاءات قديمة)':CANCEL_REASONS[k]}</span><span><b>{n}</b> <span style={{color:'var(--text3)'}}>— {pct(n)}%</span></span></div>
+          <div style={{height:8,background:'var(--bg3)',borderRadius:6,overflow:'hidden'}}><div style={{height:'100%',width:`${pct(n)}%`,background:rColor[k],transition:'width .3s'}}/></div>
+        </div>;})}
+      </div>}
+      {noteList.length>0&&<div style={{marginTop:12}}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>setShowNotes(s=>!s)}>{showNotes?'▲ إخفاء':'▼ عرض'} الأسباب المكتوبة في "سبب آخر" ({noteList.length})</button>
+        {showNotes&&<div style={{marginTop:8,display:'grid',gap:4}}>{noteList.slice(0,30).map(([t,c])=><div key={t} style={{fontSize:11,color:'var(--text2)',background:'var(--bg3)',borderRadius:6,padding:'5px 9px',display:'flex',justifyContent:'space-between',gap:8}}><span>{t}</span><b>×{c}</b></div>)}</div>}
+      </div>}
+    </div>
+
+    <div className="table-wrap" style={{marginBottom:0}}>
+      <div style={{padding:12,display:'flex',gap:8,flexWrap:'wrap',borderBottom:'1px solid var(--border)'}}>
+        <input className="input" style={{flex:'2 1 180px'}} placeholder="🔍 بحث بالاسم أو الموبايل أو رقم الأوردر" value={q} onChange={e=>{setQ(e.target.value);setPage(1);}}/>
+        <select className="input select" style={{flex:'1 1 140px'}} value={fReason} onChange={e=>{setFReason(e.target.value);setPage(1);}}>
+          <option value="">كل الأسباب</option>{Object.entries(CANCEL_REASONS).map(([k,v])=><option key={k} value={k}>{v}</option>)}<option value="none">غير محدد</option>
+        </select>
+        <select className="input select" style={{flex:'1 1 140px'}} value={fAgent} onChange={e=>{setFAgent(e.target.value);setPage(1);}}>
+          <option value="">كل الموظفين</option>{ccUsers.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
+        <select className="input select" style={{flex:'1 1 140px'}} value={fAff} onChange={e=>{setFAff(e.target.value);setPage(1);}}>
+          <option value="">كل الأفيليتس</option>{affs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <input type="date" className="input" style={{flex:'1 1 130px'}} title="من تاريخ الإلغاء" value={from} onChange={e=>{setFrom(e.target.value);setPage(1);}}/>
+        <input type="date" className="input" style={{flex:'1 1 130px'}} title="إلى تاريخ الإلغاء" value={to} onChange={e=>{setTo(e.target.value);setPage(1);}}/>
+        {filtersOn&&<button className="btn btn-danger btn-sm" onClick={()=>{setQ('');setFReason('');setFAgent('');setFAff('');setFrom('');setTo('');setPage(1);}}>✕ مسح</button>}
+      </div>
+      <table>
+        <thead><tr><th>الأوردر</th><th>العميل</th><th>المحافظة</th><th>المنتج</th><th>الموظف</th><th>سبب الإلغاء</th><th>تاريخ الإلغاء</th><th>تاريخ الأوردر</th></tr></thead>
+        <tbody>{paged.map(o=><tr key={o.id} onClick={()=>setDetail(o)}>
+          <td className="bold" style={{fontSize:11}}>{o.order_ref}</td>
+          <td><div style={{fontWeight:600,color:'var(--text)'}}>{o.customer_name}</div><div style={{fontSize:10,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div></td>
+          <td>{o.city||'-'}</td><td>{o.product_name||'-'}</td><td>{nameOf(o.assigned_to)}</td>
+          <td style={{color:rColor[o.cancel_reason||'none'],fontWeight:600,maxWidth:220}}>{cancelLabel(o)}</td>
+          <td style={{fontSize:11}}>{fmtDate(cdate(o))}</td><td style={{fontSize:11}}>{fmtDate(o.created_at)}</td>
+        </tr>)}</tbody>
+      </table>
+      <div className="order-card" style={{padding:'8px 10px'}}>
+        {paged.map(o=><div key={o.id} onClick={()=>setDetail(o)} style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:12,padding:12,marginBottom:10}}>
+          <div style={{display:'flex',justifyContent:'space-between',gap:8,fontSize:12}}><b style={{color:'var(--text)'}}>#{o.order_ref}</b><span style={{color:rColor[o.cancel_reason||'none'],fontWeight:700,textAlign:'left'}}>🚫 {cancelLabel(o)}</span></div>
+          <div style={{marginTop:6,fontWeight:600,color:'var(--text)'}}>{o.customer_name}</div>
+          <div style={{fontSize:11,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div>
+          <div style={{fontSize:11,color:'var(--text2)',marginTop:4}}>📍 {o.city||'-'} · 📦 {o.product_name||'-'} · 👤 {nameOf(o.assigned_to)}</div>
+          <div style={{fontSize:10,color:'var(--text3)',marginTop:4}}>اتلغى: {fmtDate(cdate(o))}</div>
+        </div>)}
+      </div>
+      {rows.length===0&&<div style={{textAlign:'center',color:'var(--text3)',fontSize:12,padding:30}}>مفيش أوردرات ملغية بالفلتر ده</div>}
+      <Pager total={rows.length} page={page} setPage={setPage}/>
+    </div>
+    {detail&&<DetailModal order={detail} user={user} affs={affs} users={users} doStatus={doStatus} onClose={()=>{setDetail(null);load();}}/>}
+    {node}
+  </div>;
+};
+
+/* ───────── داشبورد: أداء الكول سنتر (أدمن) ───────── */
+const AgentMonitor = () => {
+  const today = localISODate(new Date());
+  const [from,setFrom] = useState(today);
+  const [to,setTo] = useState(today);
+  const [hours,setHours] = useState(3);
+  const [stats,setStats] = useState(null);   // null تحميل | false مش مفعّل
+  const [unc,setUnc] = useState(null);
+  const preset = k => {
+    const d=new Date(), t=localISODate(d);
+    if(k==='today'){setFrom(t);setTo(t);}
+    else if(k==='yesterday'){d.setDate(d.getDate()-1);const y=localISODate(d);setFrom(y);setTo(y);}
+    else if(k==='week'){const s=new Date();s.setDate(s.getDate()-((s.getDay()+1)%7));setFrom(localISODate(s));setTo(t);}
+    else if(k==='month'){setFrom(localISODate(new Date(d.getFullYear(),d.getMonth(),1)));setTo(t);}
+  };
+  useEffect(()=>{
+    let alive=true; setStats(null);
+    const a=new Date(from+'T00:00:00'), b=new Date(to+'T00:00:00'); b.setDate(b.getDate()+1);
+    sb.rpc('app_agent_stats',{p_from:a.toISOString(),p_to:b.toISOString()}).then(({data,error})=>{if(alive)setStats(error?false:(data||[]));});
+    return()=>{alive=false;};
+  },[from,to]);
+  useEffect(()=>{
+    let alive=true; setUnc(null);
+    const load=()=>sb.rpc('app_uncontacted',{p_hours:hours}).then(({data,error})=>{if(alive)setUnc(error?false:(data||[]));});
+    load(); const t=setInterval(load,60000);
+    return()=>{alive=false;clearInterval(t);};
+  },[hours]);
+  const rate = r => r.assigned?((r.confirmed+r.shipped_out)/r.assigned*100):0;
+  const S = Array.isArray(stats)?stats:[];
+  const tot = S.reduce((a,r)=>({assigned:a.assigned+r.assigned,confirmed:a.confirmed+r.confirmed,shipped_out:a.shipped_out+r.shipped_out,cancelled:a.cancelled+r.cancelled,contacted:a.contacted+r.contacted}),{assigned:0,confirmed:0,shipped_out:0,cancelled:0,contacted:0});
+  const pBtn = (k,l) => <button key={k} className="btn btn-ghost btn-sm" onClick={()=>preset(k)}>{l}</button>;
+  return <div>
+    <div className="box" style={{padding:16,marginBottom:14}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>👥 أداء الكول سنتر</div>
+        <div style={{marginRight:'auto',display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+          {pBtn('today','اليوم')}{pBtn('yesterday','امبارح')}{pBtn('week','من سبت')}{pBtn('month','الشهر')}
+          <input type="date" className="input" style={{width:140}} value={from} max={to} onChange={e=>e.target.value&&setFrom(e.target.value)}/>
+          <span style={{fontSize:11,color:'var(--text3)'}}>→</span>
+          <input type="date" className="input" style={{width:140}} value={to} min={from} max={today} onChange={e=>e.target.value&&setTo(e.target.value)}/>
+        </div>
+      </div>
+      <div style={{fontSize:10,color:'var(--text3)',marginTop:6}}>الأرقام لأوردرات اتعملت في الفترة دي، حسب حالتها الحالية. نسبة التأكيد = (مؤكد + خرج للشحن) ÷ الأوردرات المتسندة × 100.</div>
+    </div>
+
+    {stats===false&&<div className="box" style={{padding:16,fontSize:12,color:'var(--text3)'}}>أداء الكول سنتر غير مفعّل بعد — شغّل followup-cancel-migration.sql في Supabase</div>}
+    {stats===null&&<Loading/>}
+    {Array.isArray(stats)&&<>
+      <div className="stats-grid" style={{marginBottom:14}}>
+        <div className="stat-card blue"><div className="stat-icon">📦</div><div className="stat-label">متسندة في الفترة</div><div className="stat-value">{tot.assigned}</div></div>
+        <div className="stat-card green"><div className="stat-icon">✅</div><div className="stat-label">مؤكدة + شحن</div><div className="stat-value">{tot.confirmed+tot.shipped_out}</div></div>
+        <div className="stat-card red"><div className="stat-icon">🚫</div><div className="stat-label">ملغية</div><div className="stat-value">{tot.cancelled}</div></div>
+        <div className="stat-card green"><div className="stat-icon">📈</div><div className="stat-label">نسبة التأكيد</div><div className="stat-value">{tot.assigned?((tot.confirmed+tot.shipped_out)/tot.assigned*100).toFixed(1):'0.0'}%</div></div>
+      </div>
+      <div className="box" style={{marginBottom:14}}>
+        <div style={{overflowX:'auto'}}><table>
+          <thead><tr><th>الموظف</th><th>متسندة</th><th>مؤكد</th><th>شحن</th><th>ملغي</th><th>مؤجل</th><th>لم يرد</th><th>مفتوحة</th><th>اتصل بيها</th><th>أول اتصال (متوسط)</th><th style={{minWidth:130}}>نسبة التأكيد</th></tr></thead>
+          <tbody>{S.length===0?<tr><td colSpan={11} style={{textAlign:'center',color:'var(--text3)',padding:24}}>مفيش أوردرات متسندة في الفترة دي</td></tr>:S.map(r=><tr key={r.agent_id} style={{cursor:'default'}}>
+            <td className="bold">{r.agent_name}</td><td>{r.assigned}</td><td>{r.confirmed}</td><td>{r.shipped_out}</td><td>{r.cancelled}</td><td>{r.postponed}</td><td>{r.no_answer}</td><td>{r.open_count}</td>
+            <td>{r.contacted}<span style={{color:'var(--text3)',fontSize:10}}> / {r.assigned}</span></td><td>{fmtMin(r.avg_first_contact_min)}</td>
+            <td><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{flex:1,height:6,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(rate(r),100)}%`,background:'var(--green)'}}/></div><b style={{fontSize:11,color:'var(--text)'}}>{rate(r).toFixed(0)}%</b></div></td>
+          </tr>)}</tbody>
+        </table></div>
+      </div>
+    </>}
+
+    <div className="box" style={{padding:16}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:10}}>
+        <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>⚠️ متسندة ومحدش ضغط اتصال أو واتساب عليها</div>
+        <select className="input select" style={{width:150,marginRight:'auto'}} value={hours} onChange={e=>setHours(+e.target.value)}>
+          {[1,2,3,6,12,24].map(h=><option key={h} value={h}>بعد {h} ساعة</option>)}
+        </select>
+      </div>
+      {unc===null&&<Loading/>}
+      {unc===false&&<div style={{fontSize:12,color:'var(--text3)'}}>غير مفعّل بعد — شغّل followup-cancel-migration.sql</div>}
+      {Array.isArray(unc)&&(unc.length===0
+        ? <div style={{textAlign:'center',color:'var(--green)',fontSize:12,padding:'14px 0'}}>✅ كل الأوردرات المتسندة اتلمست خلال {hours} ساعة</div>
+        : <div style={{overflowX:'auto'}}><table>
+            <thead><tr><th>الأوردر</th><th>العميل</th><th>الموظف</th><th>مستني من</th></tr></thead>
+            <tbody>{unc.map(r=><tr key={r.order_id} style={{cursor:'default'}}>
+              <td className="bold" style={{fontSize:11}}>{r.order_ref}</td>
+              <td><div style={{fontWeight:600,color:'var(--text)'}}>{r.customer_name}</div><div style={{fontSize:10,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{r.customer_phone}</div></td>
+              <td>{r.agent_name}</td><td style={{color:r.hours_waiting>=12?'var(--red)':'var(--orange)',fontWeight:700}}>{r.hours_waiting} ساعة</td>
+            </tr>)}</tbody>
+          </table></div>)}
+    </div>
+  </div>;
+};
 const statusTime = o => o.status_updated_at||o.updated_at||o.created_at;
-const StatusTime = ({o}) => <div style={{fontSize:9,color:'var(--text3)',marginTop:3,whiteSpace:'nowrap'}} title="وقت آخر تغيير للحالة">🕒 {fmtDate(statusTime(o))}</div>;
+const StatusTime = ({o}) => <>
+  <div style={{fontSize:9,color:'var(--text3)',marginTop:3,whiteSpace:'nowrap'}} title="وقت آخر تغيير للحالة">🕒 {fmtDate(statusTime(o))}</div>
+  {o.status==='postponed'&&<div style={{fontSize:9,fontWeight:700,color:'var(--purple)',marginTop:2,whiteSpace:'nowrap'}}>⏰ متابعة: {fmtFollow(o.follow_up_at)}</div>}
+  {o.status==='cancelled'&&o.cancel_reason&&<div style={{fontSize:9,fontWeight:700,color:'var(--red)',marginTop:2}}>🚫 {cancelLabel(o)}</div>}
+</>;
 const SBadge = ({status}) => <span className={`badge ${SC[status]||'badge-new'}`}><span className="badge-dot" style={{background:'currentColor'}}/>{SL[status]||status}</span>;
 
 const Modal = ({show,onClose,title,children,size='md',footer}) => {
@@ -740,6 +1176,7 @@ const Login = ({onLogin}) => {
 const Dashboard = ({user}) => {
   const [s,setS] = useState({total:0,new_p:0,confirmed:0,shipped:0,delivered:0,cancelled:0,revenue:0,pending_c:0});
   const [logs,setLogs] = useState([]);
+  const [tab,setTab] = useState('overview');
   const [loading,setLoading] = useState(true);
 
   useEffect(()=>{
@@ -762,6 +1199,11 @@ const Dashboard = ({user}) => {
 
   return <div className="page">
     <div className="page-header"><div><div className="page-title">لوحة التحكم 📊</div><div className="page-sub">مرحباً {user.name} — {new Date().toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div></div>
+    <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
+      <button className={`btn btn-sm ${tab==='overview'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('overview')}>📊 نظرة عامة</button>
+      <button className={`btn btn-sm ${tab==='agents'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('agents')}>👥 أداء الكول سنتر</button>
+    </div>
+    {tab==='agents'?<AgentMonitor/>:<>
     <DayStats/>
     <PresenceCard me={user}/>
     <div className="stats-grid">
@@ -776,6 +1218,7 @@ const Dashboard = ({user}) => {
         <div style={{textAlign:'left'}}><div style={{fontSize:11,fontWeight:600,color:'var(--text2)'}}>{log.user_name}</div><div style={{fontSize:10,color:'var(--text3)'}}>{fmtDate(log.created_at)}</div></div>
       </div>)}
     </div>
+    </>}
   </div>;
 };
 
@@ -865,14 +1308,9 @@ const OrdersPage = ({user}) => {
   };
   const SortIcon = ({col}) => sortBy===col ? (sortDir==='asc'?'↑':'↓') : '⇅';
 
-  const doStatus = async (ordId,status) => {
-    const o = orders.find(x=>x.id===ordId);
-    await sb.from('orders').update({status,updated_at:now(),status_updated_at:now()}).eq('id',ordId);
-    await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'تحديث حالة',entity:'order',detail:`${o?.order_ref}: ${SL[o?.status]} → ${SL[status]}`,created_at:now()});
-    toast(`تم التحديث إلى "${SL[status]}"`,'success'); load();
-  };
+  const {doStatus,node:statusNode} = useStatusActions(user,id=>orders.find(x=>x.id===id),load,()=>setM('detail',null));
 
-  const ccAllow=['confirmed','cancelled','follow_up','no_answer_1','no_answer_2'];
+  const ccAllow=['confirmed','cancelled','follow_up','postponed','no_answer_1','no_answer_2'];
   const shipAllow=['shipped','delivered','not_delivered'];
   const getActs=o=>{
     if(user.role==='call_center') return ccAllow.filter(s=>s!==o.status);
@@ -1104,6 +1542,7 @@ const OrdersPage = ({user}) => {
     {modals.import&&<ImportModal user={user} affs={affs} onClose={()=>{setM('import',false);load();}}/>}
     {modals.add&&<AddModal user={user} affs={affs} onClose={()=>{setM('add',false);load();}}/>}
     {modals.assign&&<AssignModal order={modals.assign} ccUsers={ccUsers} user={user} onClose={()=>{setM('assign',null);load();}}/>}
+    {statusNode}
     {modals.bulkStatus&&<BulkStatusModal orders={orders.filter(o=>sel.includes(o.id))} allowed={user.role==='admin'?Object.keys(SL):user.role==='call_center'?ccAllow:shipAllow} user={user} onClose={done=>{setM('bulkStatus',false);if(done)setSel([]);load();}}/>}
     {modals.bulkAssign&&<BulkAssignModal orderIds={sel} ccUsers={ccUsers} user={user} onClose={()=>{setM('bulkAssign',false);setSel([]);load();}}/>}
   </div>;
@@ -1145,7 +1584,7 @@ const DetailModal = ({order,user,affs,users,doStatus,onEdit,onPrint,onClose,dups
   const avail = (()=>{
     const all=Object.keys(SL).filter(s=>s!==order.status);
     if(user.role==='admin') return all;
-    if(user.role==='call_center'&&order.assigned_to===user.id) return ['confirmed','cancelled','follow_up','no_answer_1','no_answer_2'].filter(s=>s!==order.status);
+    if(user.role==='call_center'&&order.assigned_to===user.id) return ['confirmed','cancelled','follow_up','postponed','no_answer_1','no_answer_2'].filter(s=>s!==order.status);
     if(user.role==='shipping') return ['shipped','delivered','not_delivered'].filter(s=>s!==order.status);
     return[];
   })();
@@ -1155,12 +1594,14 @@ const DetailModal = ({order,user,affs,users,doStatus,onEdit,onPrint,onClose,dups
     <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
       <SBadge status={order.status}/>
       <span className="chip">🕒 آخر تغيير للحالة: {fmtDate(statusTime(order))}</span>
+      {order.status==='postponed'&&<span className="chip" style={{color:'var(--purple)',borderColor:'var(--purple)'}}>⏰ متابعة: {fmtFollow(order.follow_up_at)}</span>}
+      {order.status==='cancelled'&&<span className="chip" style={{color:'var(--red)',borderColor:'var(--red)'}}>🚫 {cancelLabel(order)}</span>}
       {aff&&<span className="chip">🎯 {aff.name}</span>}
       {au&&<span className="chip">👤 {au.name}</span>}
       {order.source&&<span className="chip">📡 {order.source}</span>}
       <div style={{marginRight:'auto',display:'flex',gap:6}}>
-        {(user.role==='admin'||(user.role==='call_center'&&order.assigned_to===user.id))&&<button className="btn btn-warning btn-sm" onClick={onEdit}>✏️ تعديل</button>}
-        <button className="btn btn-ghost btn-sm" onClick={onPrint}>🖨️ طباعة</button>
+        {onEdit&&(user.role==='admin'||(user.role==='call_center'&&order.assigned_to===user.id))&&<button className="btn btn-warning btn-sm" onClick={onEdit}>✏️ تعديل</button>}
+        {onPrint&&<button className="btn btn-ghost btn-sm" onClick={onPrint}>🖨️ طباعة</button>}
       </div>
     </div>
     {dups&&dups.matches.length>0&&<div style={{background:dups.isDup?'var(--orange-bg)':'var(--bg3)',border:`1px solid ${dups.isDup?'var(--orange)':'var(--border)'}`,borderRadius:10,padding:'10px 12px',marginBottom:12}}>
@@ -1229,12 +1670,16 @@ const DetailModal = ({order,user,affs,users,doStatus,onEdit,onPrint,onClose,dups
 ═══════════════════════════════════ */
 const EditModal = ({order,user,affs,onClose}) => {
   const [f,setF] = useState({...order});
+  const [fu,setFu] = useState(order.follow_up_at?toLocalInput(order.follow_up_at):'');
   const [saving,setSaving] = useState(false);
   const sf = (k,v) => setF(x=>({...x,[k]:v}));
 
   const save = async () => {
+    const p={...f};
+    if(p.status==='postponed'){ if(!fu){toast('اختر ميعاد المتابعة','error');return;} p.follow_up_at=new Date(fu).toISOString(); }
+    if(p.status==='cancelled'){ if(!p.cancel_reason){toast('اختر سبب الإلغاء','error');return;} if(p.cancel_reason==='other'&&!(p.cancel_note||'').trim()){toast('اكتب السبب','error');return;} }
     setSaving(true);
-    const {error} = await sb.from('orders').update({...f,updated_at:now(),...(f.status!==order.status?{status_updated_at:now()}:{})}).eq('id',order.id);
+    const {error} = await sb.from('orders').update({...p,updated_at:now(),...(p.status!==order.status?{status_updated_at:now()}:{})}).eq('id',order.id);
     if(error){toast('حدث خطأ: '+error.message,'error');setSaving(false);return;}
     await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'تعديل أوردر',entity:'order',detail:`تعديل ${order.order_ref}`,created_at:now()});
     toast('تم الحفظ ✅','success'); onClose();
@@ -1286,6 +1731,8 @@ const EditModal = ({order,user,affs,onClose}) => {
             {Object.entries(SL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
           </select>
         </div>
+        {f.status==='postponed'&&<div style={{gridColumn:'1/-1',marginBottom:12}}><PostponeFields value={fu} onChange={setFu}/></div>}
+        {f.status==='cancelled'&&<div style={{gridColumn:'1/-1',marginBottom:12}}><CancelFields reason={f.cancel_reason||''} note={f.cancel_note||''} setReason={v=>sf('cancel_reason',v)} setNote={v=>sf('cancel_note',v)}/></div>}
       </>}
       {inp('ملاحظات','note','textarea',true)}
     </div>
@@ -1556,30 +2003,26 @@ const BulkAssignModal = ({orderIds,ccUsers,user,onClose}) => {
 const BulkStatusModal = ({orders:sel,allowed,user,onClose}) => {
   const [status,setStatus] = useState('');
   const [saving,setSaving] = useState(false);
+  const [when,setWhen] = useState(()=>toLocalInput(at11(1)));
+  const [reason,setReason] = useState('');
+  const [note,setNote] = useState('');
   const counts = sel.reduce((m,o)=>(m[o.status]=(m[o.status]||0)+1,m),{});
-  const targets = sel.filter(o=>o.status!==status);
+  const targets = status==='postponed' ? sel : sel.filter(o=>o.status!==status);
+  const bad = (status==='cancelled'&&(!reason||(reason==='other'&&note.trim().length<2))) || (status==='postponed'&&!when);
   const go = async () => {
     if(!status){toast('اختر الحالة الجديدة','error');return;}
     if(!targets.length){toast('كل الأوردرات المحددة في الحالة دي بالفعل','error');return;}
+    if(status==='cancelled'&&!reason){toast('اختر سبب الإلغاء','error');return;}
+    if(status==='cancelled'&&reason==='other'&&note.trim().length<2){toast('اكتب السبب','error');return;}
     setSaving(true);
-    const updated=[];
-    for(let i=0;i<targets.length;i+=100){
-      const chunk=targets.slice(i,i+100);
-      const {data,error}=await sb.from('orders').update({status,updated_at:now(),status_updated_at:now()}).in('id',chunk.map(o=>o.id)).select('id');
-      if(error){toast('حدث خطأ: '+error.message,'error');break;}
-      const ok=new Set((data||[]).map(r=>r.id));
-      chunk.forEach(o=>ok.has(o.id)&&updated.push(o));
-    }
-    if(updated.length){
-      const refs=updated.slice(0,15).map(o=>o.order_ref).join('، ')+(updated.length>15?` … (+${updated.length-15})`:'');
-      await sb.from('audit_logs').insert({id:uid(),user_id:user.id,user_name:user.name,action:'تحديث حالة bulk',entity:'orders',detail:`${updated.length} أوردر → ${SL[status]}: ${refs}`,created_at:now()});
-    }
+    const extra = status==='postponed' ? {follow_up_at:new Date(when).toISOString()} : status==='cancelled' ? {cancel_reason:reason,cancel_note:reason==='other'?note.trim():null} : null;
+    const updated = await applyStatus(targets,status,extra,user);
     if(updated.length===targets.length) toast(`تم تحديث ${updated.length} أوردر إلى "${SL[status]}" ✅`,'success');
     else toast(`تم تحديث ${updated.length} من ${targets.length} أوردر`,'error');
     setSaving(false); onClose(updated.length>0);
   };
   return <Modal show={true} onClose={()=>onClose(false)} title={`🔄 تغيير حالة ${sel.length} أوردر`} size="sm"
-    footer={<><button className="btn btn-ghost" onClick={()=>onClose(false)}>إلغاء</button><button className="btn btn-primary" onClick={go} disabled={saving||!status||!targets.length}>{saving?'⏳ جاري التحديث...':`تحديث ${targets.length} أوردر`}</button></>}>
+    footer={<><button className="btn btn-ghost" onClick={()=>onClose(false)}>إلغاء</button><button className="btn btn-primary" onClick={go} disabled={saving||!status||!targets.length||bad}>{saving?'⏳ جاري التحديث...':`تحديث ${targets.length} أوردر`}</button></>}>
     <div style={{marginBottom:14}}>
       <div style={{fontSize:11,color:'var(--text3)',marginBottom:6}}>الحالات الحالية للأوردرات المحددة</div>
       <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{Object.entries(counts).map(([k,n])=><span key={k} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11,color:'var(--text2)'}}><SBadge status={k}/>× {n}</span>)}</div>
@@ -1587,6 +2030,8 @@ const BulkStatusModal = ({orders:sel,allowed,user,onClose}) => {
     <div className="form-group"><label className="form-label">الحالة الجديدة</label>
       <select className="input select" value={status} onChange={e=>setStatus(e.target.value)}><option value="">اختر...</option>{allowed.map(k=><option key={k} value={k}>{SL[k]}</option>)}</select>
     </div>
+    {status==='postponed'&&<div style={{margin:'0 0 12px'}}><PostponeFields value={when} onChange={setWhen}/></div>}
+    {status==='cancelled'&&<div style={{margin:'0 0 12px'}}><CancelFields reason={reason} note={note} setReason={setReason} setNote={setNote}/></div>}
     {status&&<div style={{background:'var(--blue-bg)',borderRadius:8,padding:12,fontSize:12,color:'var(--blue)'}}>
       هيتحدّث {targets.length} أوردر إلى "{SL[status]}"{sel.length-targets.length>0&&` — وتم تخطي ${sel.length-targets.length} لأنهم في الحالة دي بالفعل`}
     </div>}
@@ -2161,8 +2606,8 @@ const AuditPage = () => {
    APP SHELL
 ═══════════════════════════════════ */
 const NAV={
-  admin:[{id:'dashboard',icon:'📊',label:'لوحة التحكم'},{id:'orders',icon:'📋',label:'الأوردرات'},{id:'shipping',icon:'🚚',label:'قسم الشحن'},{id:'affiliates',icon:'🎯',label:'الأفيليتس'},{id:'commissions',icon:'💰',label:'العمولات'},{id:'users',icon:'👥',label:'المستخدمون'},{id:'audit',icon:'📝',label:'سجل النشاطات'}],
-  call_center:[{id:'orders',icon:'📋',label:'أوردراتي'}],
+  admin:[{id:'dashboard',icon:'📊',label:'لوحة التحكم'},{id:'orders',icon:'📋',label:'الأوردرات'},{id:'followups',icon:'⏰',label:'مطلوب متابعة'},{id:'shipping',icon:'🚚',label:'قسم الشحن'},{id:'affiliates',icon:'🎯',label:'الأفيليتس'},{id:'commissions',icon:'💰',label:'العمولات'},{id:'users',icon:'👥',label:'المستخدمون'},{id:'cancellations',icon:'🚫',label:'الإلغاءات'},{id:'audit',icon:'📝',label:'سجل النشاطات'}],
+  call_center:[{id:'orders',icon:'📋',label:'أوردراتي'},{id:'followups',icon:'⏰',label:'مطلوب متابعة'}],
   shipping:[{id:'shipping',icon:'🚚',label:'قسم الشحن'}],
 };
 
@@ -2172,6 +2617,8 @@ const Shell = ({user,onLogout}) => {
   const pageRef=useRef(page); pageRef.current=page;
   usePresenceBeat(pageRef,onLogout);
   const [badges,setBadges]=useState({});
+  const [tick,setTick]=useState(0);
+  useEffect(()=>{const t=setInterval(()=>setTick(x=>x+1),120000);return()=>clearInterval(t);},[]);
   const [sideOpen,setSideOpen]=useState(false);
   const nav=NAV[user.role]||[];
   const closeSide=()=>setSideOpen(false);
@@ -2185,21 +2632,24 @@ const Shell = ({user,onLogout}) => {
 
   useEffect(()=>{
     (async()=>{
-      const [{data:o},{data:c}]=await Promise.all([
+      const endToday=new Date(); endToday.setHours(23,59,59,999);
+      const [{data:o},{data:c},{count:fu}]=await Promise.all([
         sb.from('orders').select('status,assigned_to'),
         sb.from('commissions').select('is_paid'),
+        sb.from('orders').select('id',{count:'exact',head:true}).eq('status','postponed').lte('follow_up_at',endToday.toISOString()),
       ]);
       const ords=o||[];
       setBadges({
         orders:user.role==='admin'?ords.filter(x=>['new','pending'].includes(x.status)).length:ords.filter(x=>x.assigned_to===user.id&&!['confirmed','cancelled','delivered'].includes(x.status)).length,
         shipping:ords.filter(x=>x.status==='confirmed').length,
         commissions:(c||[]).filter(x=>!x.is_paid).length,
+        followups:fu||0,
       });
     })();
-  },[page,user]);
+  },[page,user,tick]);
 
-  const pages={dashboard:<Dashboard user={user}/>,orders:<OrdersPage user={user}/>,shipping:<ShippingPage user={user}/>,affiliates:<AffsPage user={user}/>,commissions:<CommsPage user={user}/>,users:<UsersPage user={user}/>,audit:<AuditPage/>};
-  const titles={dashboard:'لوحة التحكم',orders:'الأوردرات',shipping:'قسم الشحن',affiliates:'الأفيليتس',commissions:'العمولات',users:'المستخدمون',audit:'سجل النشاطات'};
+  const pages={dashboard:<Dashboard user={user}/>,orders:<OrdersPage user={user}/>,shipping:<ShippingPage user={user}/>,affiliates:<AffsPage user={user}/>,commissions:<CommsPage user={user}/>,users:<UsersPage user={user}/>,audit:<AuditPage/>,followups:<FollowUpsPage user={user}/>,cancellations:<CancellationsPage user={user}/>};
+  const titles={dashboard:'لوحة التحكم',orders:'الأوردرات',shipping:'قسم الشحن',affiliates:'الأفيليتس',commissions:'العمولات',users:'المستخدمون',audit:'سجل النشاطات',followups:'مطلوب متابعة',cancellations:'الإلغاءات'};
   const rc={admin:'var(--accent)',call_center:'var(--purple)',shipping:'var(--orange)'};
 
   return <div className="app-layout">
