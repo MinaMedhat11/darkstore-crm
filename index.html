@@ -264,7 +264,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.10.25-followups';
+const APP_VERSION = '2026.10.25-export-fix';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = localStorage.getItem('crm_t')||'';
@@ -2090,7 +2090,7 @@ const exportConfirmedOrders = (orders, affiliates, dupMap={}, fileLabel='confirm
       'سعر 6': getP(prices,5),
       'مروة': aff?aff.name:'',
       'المندوب': '',
-      '   ': '',
+      '   ': 'الاتصال قبل الوصول بساعة',
       'المدة': '',
       'من': '',
       'الى': '',
@@ -2101,11 +2101,11 @@ const exportConfirmedOrders = (orders, affiliates, dupMap={}, fileLabel='confirm
   });
 
   const ws = XLSX.utils.json_to_sheet(rows, {
-    header:['رقم','اسم العميل','المحمول','التليفون','المحافظة','المنطقة','','  ','   ','العنوان','اليوم','التاريخ','الشهر','السنة','معاد التسليم','منتج 1','كمية 1','سعر1','الشحن','منتج 2','كمية 2','سعر 2','منتج 3','كمية 3','سعر 3 ','منتج 4','كمية 4','سعر 4','منتج 5','كمية 5','سعر 5','منتج 6','كمية 6','سعر 6','مروة','المندوب',' ','المدة','من','الى','ترويج 1','ترويج 2','ترويج 3']
+    header:['رقم','اسم العميل','المحمول','التليفون','المحافظة','المنطقة','','  ','العنوان','   ','اليوم','التاريخ','الشهر','السنة','معاد التسليم','منتج 1','كمية 1','سعر1','الشحن','منتج 2','كمية 2','سعر 2','منتج 3','كمية 3','سعر 3 ','منتج 4','كمية 4','سعر 4','منتج 5','كمية 5','سعر 5','منتج 6','كمية 6','سعر 6','مروة','المندوب',' ','المدة','من','الى','ترويج 1','ترويج 2','ترويج 3']
   });
 
   // Style: RTL, column widths
-  ws['!cols'] = [{wch:6},{wch:20},{wch:14},{wch:14},{wch:12},{wch:12},{wch:10},{wch:6},{wch:6},{wch:30},{wch:10},{wch:8},{wch:6},{wch:6},{wch:14},{wch:20},{wch:8},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:14},{wch:14},{wch:6},{wch:8},{wch:8},{wch:8},{wch:14},{wch:14},{wch:14}];
+  ws['!cols'] = [{wch:6},{wch:20},{wch:14},{wch:14},{wch:12},{wch:12},{wch:10},{wch:6},{wch:30},{wch:26},{wch:10},{wch:8},{wch:6},{wch:6},{wch:14},{wch:20},{wch:8},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:20},{wch:8},{wch:8},{wch:14},{wch:14},{wch:6},{wch:8},{wch:8},{wch:8},{wch:14},{wch:14},{wch:14}];
   ws['!rtl'] = true;
 
   const wb = XLSX.utils.book_new();
