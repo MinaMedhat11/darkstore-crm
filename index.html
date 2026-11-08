@@ -264,7 +264,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.10.25-export-fix';
+const APP_VERSION = '2026.10.25-scale';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = localStorage.getItem('crm_t')||'';
@@ -358,7 +358,7 @@ const useDuplicates = orders => {
   useEffect(()=>{
     let alive=true;
     if(!orders.length){setRows([]);return;}
-    sb.rpc('app_duplicates').then(({data,error})=>{ if(alive) setRows(error?null:(data||[])); });
+    fetchAllRows(()=>sb.rpc('app_duplicates'),{silent:true,nullOnError:true}).then(rows=>{ if(alive) setRows(rows); });
     return()=>{alive=false;};
   },[orders]);
   return useMemo(()=>buildDupMap(rows||localDuplicateRows(orders)),[rows,orders]);
@@ -700,12 +700,17 @@ const useStatusActions = (user,find,reload,afterModalDone) => {
 };
 
 const WEEK_AR = ['سبت','أحد','اثنين','ثلاثاء','أربعاء','خميس','جمعة'];
-const fetchAllRows = async (build) => {
-  const all=[]; let i=0;
+// تحميل كل الصفحات (Supabase بيرجّع 1000 صف كحد أقصى في الطلب): 4 طلبات متوازية، ولازم الاستعلام يكون فيه ترتيب ثابت (… .order('id'))
+const fetchAllRows = async (build,opt={}) => {
+  const all=[]; let i=0; const batch=4;
   for(;;){
-    const {data,error}=await build().range(i,i+999);
-    if(error||!data) break;
-    all.push(...data); if(data.length<1000) break; i+=1000;
+    const res=await Promise.all(Array.from({length:batch},(_,k)=>build().range(i+k*1000,i+k*1000+999)));
+    let done=false;
+    for(const r of res){
+      if(r.error||!r.data){ if(!opt.silent) toast('تعذر تحميل كل البيانات'+(r.error?': '+r.error.message:''),'error'); return opt.nullOnError?null:all; }
+      all.push(...r.data); if(r.data.length<1000){done=true;break;}
+    }
+    if(done) break; i+=batch*1000;
   }
   return all;
 };
@@ -1181,13 +1186,18 @@ const Dashboard = ({user}) => {
 
   useEffect(()=>{
     (async()=>{
-      const [{data:o},{data:c},{data:a}] = await Promise.all([
-        sb.from('orders').select('status,total_cost,discount'),
-        sb.from('commissions').select('amount,is_paid'),
+      const [st,{data:a}] = await Promise.all([
+        sb.rpc('app_dashboard_stats'),
         sb.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(8),
       ]);
-      const ord=o||[];
-      setS({total:ord.length,new_p:ord.filter(x=>['new','pending'].includes(x.status)).length,confirmed:ord.filter(x=>x.status==='confirmed').length,shipped:ord.filter(x=>x.status==='shipped').length,delivered:ord.filter(x=>x.status==='delivered').length,cancelled:ord.filter(x=>x.status==='cancelled').length,revenue:ord.filter(x=>x.status==='delivered').reduce((t,x)=>t+(x.total_cost||0)-(x.discount||0),0),pending_c:(c||[]).filter(x=>!x.is_paid).reduce((t,x)=>t+x.amount,0)});
+      if(!st.error&&st.data){ setS(st.data); }                       // الأرقام من السيرفر على كل الأوردرات
+      else {                                                           // احتياطي لو الدالة لسه متضافتش: تحميل بالصفحات
+        const [ord,c]=await Promise.all([
+          fetchAllRows(()=>sb.from('orders').select('status,total_cost,discount').order('id')),
+          fetchAllRows(()=>sb.from('commissions').select('amount,is_paid').order('id')),
+        ]);
+        setS({total:ord.length,new_p:ord.filter(x=>['new','pending'].includes(x.status)).length,confirmed:ord.filter(x=>x.status==='confirmed').length,shipped:ord.filter(x=>x.status==='shipped').length,delivered:ord.filter(x=>x.status==='delivered').length,cancelled:ord.filter(x=>x.status==='cancelled').length,revenue:ord.filter(x=>x.status==='delivered').reduce((t,x)=>t+(x.total_cost||0)-(x.discount||0),0),pending_c:c.filter(x=>!x.is_paid).reduce((t,x)=>t+x.amount,0)});
+      }
       setLogs(a||[]); setLoading(false);
     })();
   },[]);
@@ -1254,11 +1264,9 @@ const OrdersPage = ({user}) => {
     const [a,u,o] = await Promise.all([
       sb.from('affiliates').select('*').order('name'),
       sb.from('users').select(USER_COLS).order('name'),
-      user.role==='call_center'
-        ? sb.from('orders').select('*').eq('assigned_to',user.id).order('created_at',{ascending:false})
-        : sb.from('orders').select('*').order('created_at',{ascending:false}),
+      fetchAllRows(()=>(user.role==='call_center'?sb.from('orders').select('*').eq('assigned_to',user.id):sb.from('orders').select('*')).order('created_at',{ascending:false}).order('id')),
     ]);
-    setAffs(a.data||[]); setUsers(u.data||[]); setOrders(o.data||[]); setLoading(false);
+    setAffs(a.data||[]); setUsers(u.data||[]); setOrders(o||[]); setLoading(false);
     // الأوردرات اللي اتضغط لها على زرار الواتساب (للأدمن بس)
     if(user.role==='admin'){
       const m={}; let i=0, ok=true;
@@ -2134,8 +2142,8 @@ const ShippingPage = ({user}) => {
 
   const load = useCallback(async()=>{
     setLoading(true);
-    const [{data:o},{data:a}]=await Promise.all([
-      sb.from('orders').select('*').in('status',['confirmed','shipped','delivered','not_delivered']).order('created_at',{ascending:false}),
+    const [o,{data:a}]=await Promise.all([
+      fetchAllRows(()=>sb.from('orders').select('*').in('status',['confirmed','shipped','delivered','not_delivered']).order('created_at',{ascending:false}).order('id')),
       sb.from('affiliates').select('*'),
     ]);
     setOrders(o||[]); setAffs(a||[]); setLoading(false);
@@ -2269,10 +2277,10 @@ const AffsPage = ({user}) => {
 
   const load = useCallback(async()=>{
     setLoading(true);
-    const [{data:af},{data:or},{data:co}]=await Promise.all([
+    const [{data:af},or,co]=await Promise.all([
       sb.from('affiliates').select('*').order('name'),
-      sb.from('orders').select('affiliate_id,status,total_cost,discount'),
-      sb.from('commissions').select('affiliate_id,amount,is_paid'),
+      fetchAllRows(()=>sb.from('orders').select('affiliate_id,status,total_cost,discount').order('id')),
+      fetchAllRows(()=>sb.from('commissions').select('affiliate_id,amount,is_paid').order('id')),
     ]);
     setAffs(af||[]);
     const s={};
@@ -2354,9 +2362,9 @@ const AffDetailModal = ({aff,user,onClose}) => {
 
   useEffect(()=>{
     (async()=>{
-      const [{data:o},{data:c}]=await Promise.all([
-        sb.from('orders').select('*').eq('affiliate_id',aff.id).order('created_at',{ascending:false}),
-        sb.from('commissions').select('*').eq('affiliate_id',aff.id),
+      const [o,c]=await Promise.all([
+        fetchAllRows(()=>sb.from('orders').select('*').eq('affiliate_id',aff.id).order('created_at',{ascending:false}).order('id')),
+        fetchAllRows(()=>sb.from('commissions').select('*').eq('affiliate_id',aff.id).order('id')),
       ]);
       setOrders(o||[]); setComms(c||[]); setLoading(false);
     })();
@@ -2370,7 +2378,7 @@ const AffDetailModal = ({aff,user,onClose}) => {
     const {error}=await sb.from('commissions').insert({id:uid(),order_id:ordId,affiliate_id:aff.id,amount:parseFloat(amt),is_paid:false,paid_at:null,paid_by:null,payment_batch:null,created_at:now()});
     if(error){toast('خطأ','error');return;}
     toast('تم إضافة العمولة ✅','success'); setAddComm(null);
-    const {data:c}=await sb.from('commissions').select('*').eq('affiliate_id',aff.id);
+    const c=await fetchAllRows(()=>sb.from('commissions').select('*').eq('affiliate_id',aff.id).order('id'));
     setComms(c||[]);
   };
 
@@ -2425,9 +2433,9 @@ const CommsPage = ({user}) => {
 
   const load=useCallback(async()=>{
     setLoading(true);
-    const [{data:c},{data:o},{data:a}]=await Promise.all([
-      sb.from('commissions').select('*').order('created_at',{ascending:false}),
-      sb.from('orders').select('id,order_ref'),
+    const [c,o,{data:a}]=await Promise.all([
+      fetchAllRows(()=>sb.from('commissions').select('*').order('created_at',{ascending:false}).order('id')),
+      fetchAllRows(()=>sb.from('orders').select('id,order_ref').order('id')),
       sb.from('affiliates').select('*'),
     ]);
     setComms(c||[]); setOrders(o||[]); setAffs(a||[]); setLoading(false);
@@ -2633,18 +2641,15 @@ const Shell = ({user,onLogout}) => {
   useEffect(()=>{
     (async()=>{
       const endToday=new Date(); endToday.setHours(23,59,59,999);
-      const [{data:o},{data:c},{count:fu}]=await Promise.all([
-        sb.from('orders').select('status,assigned_to'),
-        sb.from('commissions').select('is_paid'),
-        sb.from('orders').select('id',{count:'exact',head:true}).eq('status','postponed').lte('follow_up_at',endToday.toISOString()),
+      const H=()=>sb.from('orders').select('id',{count:'exact',head:true});
+      const cnt=q=>q.then(r=>r.count||0,()=>0);
+      const [bOrders,bShip,bComm,bFu]=await Promise.all([
+        user.role==='admin' ? cnt(H().in('status',['new','pending'])) : cnt(H().eq('assigned_to',user.id).not('status','in','(confirmed,cancelled,delivered)')),
+        cnt(H().eq('status','confirmed')),
+        cnt(sb.from('commissions').select('id',{count:'exact',head:true}).eq('is_paid',false)),
+        cnt(H().eq('status','postponed').lte('follow_up_at',endToday.toISOString())),
       ]);
-      const ords=o||[];
-      setBadges({
-        orders:user.role==='admin'?ords.filter(x=>['new','pending'].includes(x.status)).length:ords.filter(x=>x.assigned_to===user.id&&!['confirmed','cancelled','delivered'].includes(x.status)).length,
-        shipping:ords.filter(x=>x.status==='confirmed').length,
-        commissions:(c||[]).filter(x=>!x.is_paid).length,
-        followups:fu||0,
-      });
+      setBadges({orders:bOrders,shipping:bShip,commissions:bComm,followups:bFu});
     })();
   },[page,user,tick]);
 
