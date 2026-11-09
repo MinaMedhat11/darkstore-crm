@@ -264,7 +264,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.10.25-scale';
+const APP_VERSION = '2026.10.25-range';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = localStorage.getItem('crm_t')||'';
@@ -434,25 +434,33 @@ const OrderTimeline = ({order,events,users,affs}) => {
 const SHIPPED_OUT = ['shipped','delivered','not_delivered'];
 const localISODate = d => new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
 const DayStats = () => {
-  const [day,setDay] = useState(()=>localISODate(new Date()));
-  const [rows,setRows] = useState(null);
   const today = localISODate(new Date());
+  const [from,setFrom] = useState(today);
+  const [to,setTo] = useState(today);
+  const [rows,setRows] = useState(null);
+  const [showDays,setShowDays] = useState(false);
+  const addDays = (iso,n) => { const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return localISODate(d); };
+  const diffDays = (x,y) => Math.round((new Date(x+'T00:00:00')-new Date(y+'T00:00:00'))/86400000);
+  const span = diffDays(to,from)+1;                                   // عدد أيام الفترة
   useEffect(()=>{
     let alive=true; setRows(null);
-    (async()=>{
-      const from=new Date(day+'T00:00:00'); const to=new Date(from); to.setDate(to.getDate()+1);
-      let all=[],i=0;
-      for(;;){
-        const {data,error}=await sb.from('orders').select('status').gte('created_at',from.toISOString()).lt('created_at',to.toISOString()).order('created_at').order('id').range(i,i+999);
-        if(error||!data) break;
-        all=all.concat(data); if(data.length<1000) break; i+=1000;
-      }
-      if(alive) setRows(all);
-    })();
+    const a=new Date(from+'T00:00:00'), b=new Date(to+'T00:00:00'); b.setDate(b.getDate()+1);
+    fetchAllRows(()=>sb.from('orders').select('status,created_at').gte('created_at',a.toISOString()).lt('created_at',b.toISOString()).order('created_at').order('id')).then(all=>{ if(alive) setRows(all); });
     return()=>{alive=false;};
-  },[day]);
-  const shift = n => { const d=new Date(day+'T00:00:00'); d.setDate(d.getDate()+n); setDay(localISODate(d)); };
-  const yest = (()=>{const d=new Date();d.setDate(d.getDate()-1);return localISODate(d);})();
+  },[from,to]);
+  const yest = addDays(today,-1);
+  const wd = new Date(); wd.setDate(wd.getDate()-((wd.getDay()+1)%7));
+  const presets = [
+    {k:'today',l:'اليوم',f:today,t:today},
+    {k:'yest',l:'امبارح',f:yest,t:yest},
+    {k:'7d',l:'آخر 7 أيام',f:addDays(today,-6),t:today},
+    {k:'week',l:'من السبت',f:localISODate(wd),t:today},
+    {k:'month',l:'الشهر',f:localISODate(new Date(new Date().getFullYear(),new Date().getMonth(),1)),t:today},
+  ];
+  const active = presets.find(x=>x.f===from&&x.t===to);
+  // تحريك الفترة كلها بنفس طولها (والنهاية متعديش النهاردة)
+  const shift = dir => { let f=addDays(from,span*dir), t=addDays(to,span*dir); if(t>today){const over=diffDays(t,today); t=today; f=addDays(f,-over);} setFrom(f); setTo(t); };
+
   const total=rows?rows.length:0;
   const n=st=>rows?rows.filter(o=>o.status===st).length:0;
   const confirmed=n('confirmed');
@@ -461,26 +469,52 @@ const DayStats = () => {
   const open=total-confirmed-shippedOut-cancelled;
   const rate=total?((confirmed+shippedOut)/total*100):0;
   const v=x=>rows===null?'…':x;
-  const cards=[{c:'blue',i:'📦',l:'أوردرات اليوم (جديدة)',v:v(total)},{c:'green',i:'✅',l:'مؤكدة',v:v(confirmed)},{c:'orange',i:'🚚',l:'خرجت للشحن',v:v(shippedOut)},{c:'red',i:'❌',l:'ملغية',v:v(cancelled)},{c:'yellow',i:'⏳',l:'لسه مفتوحة',v:v(open)},{c:'green',i:'📈',l:'نسبة التأكيد',v:rows===null?'…':rate.toFixed(1)+'%'}];
+  const one = span===1;
+  const cards=[{c:'blue',i:'📦',l:one?'أوردرات اليوم (جديدة)':'أوردرات الفترة',v:v(total)},{c:'green',i:'✅',l:'مؤكدة',v:v(confirmed)},{c:'orange',i:'🚚',l:'خرجت للشحن',v:v(shippedOut)},{c:'red',i:'❌',l:'ملغية',v:v(cancelled)},{c:'yellow',i:'⏳',l:'لسه مفتوحة',v:v(open)},{c:'green',i:'📈',l:'نسبة التأكيد',v:rows===null?'…':rate.toFixed(1)+'%'}];
+  const fmtD = (iso,o) => new Date(iso+'T00:00:00').toLocaleDateString('ar-EG',o);
+  const label = one ? fmtD(from,{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : `من ${fmtD(from,{weekday:'long',day:'numeric',month:'long'})} إلى ${fmtD(to,{weekday:'long',day:'numeric',month:'long',year:'numeric'})} (${span} يوم)`;
+  // تفصيل كل يوم (للفترات اللي أكتر من يوم)
+  const perDay = (()=>{
+    if(one||!rows) return [];
+    const m={}; for(let i=0;i<span;i++) m[addDays(from,i)]={day:addDays(from,i),total:0,confirmed:0,shipped:0,cancelled:0};
+    rows.forEach(o=>{const e=m[localISODate(new Date(o.created_at))]; if(!e) return; e.total++; if(o.status==='confirmed')e.confirmed++; else if(SHIPPED_OUT.includes(o.status))e.shipped++; else if(o.status==='cancelled')e.cancelled++;});
+    return Object.values(m).reverse();
+  })();
   return <div className="table-wrap" style={{padding:16,marginBottom:16}}>
     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:14}}>
-      <div>
-        <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>📅 إحصائيات يوم</div>
-        <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{new Date(day+'T00:00:00').toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
+      <div style={{minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{one?'📅 إحصائيات يوم':'📅 إحصائيات فترة'}</div>
+        <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{label}</div>
       </div>
       <div style={{marginRight:'auto',display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-        <button className="btn btn-ghost btn-sm" onClick={()=>shift(-1)}>⏮ اليوم السابق</button>
-        <input type="date" className="input" style={{width:150}} value={day} max={today} onChange={e=>e.target.value&&setDay(e.target.value)}/>
-        <button className="btn btn-ghost btn-sm" disabled={day>=today} onClick={()=>shift(1)}>اليوم التالي ⏭</button>
-        <button className={`btn btn-sm ${day===today?'btn-primary':'btn-ghost'}`} onClick={()=>setDay(today)}>اليوم</button>
-        <button className={`btn btn-sm ${day===yest?'btn-primary':'btn-ghost'}`} onClick={()=>setDay(yest)}>امبارح</button>
+        {presets.map(x=><button key={x.k} className={`btn btn-sm ${active&&active.k===x.k?'btn-primary':'btn-ghost'}`} onClick={()=>{setFrom(x.f);setTo(x.t);}}>{x.l}</button>)}
       </div>
+    </div>
+    <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:14}}>
+      <button className="btn btn-ghost btn-sm" onClick={()=>shift(-1)}>⏮ {one?'اليوم السابق':'الفترة السابقة'}</button>
+      <span style={{fontSize:11,color:'var(--text3)'}}>من</span>
+      <input type="date" className="input" style={{width:145}} value={from} max={to} onChange={e=>e.target.value&&setFrom(e.target.value)}/>
+      <span style={{fontSize:11,color:'var(--text3)'}}>إلى</span>
+      <input type="date" className="input" style={{width:145}} value={to} min={from} max={today} onChange={e=>e.target.value&&setTo(e.target.value)}/>
+      <button className="btn btn-ghost btn-sm" disabled={to>=today} onClick={()=>shift(1)}>{one?'اليوم التالي':'الفترة التالية'} ⏭</button>
     </div>
     <div className="stats-grid" style={{marginBottom:12}}>
       {cards.map((x,i)=><div key={i} className={`stat-card ${x.c}`}><div className="stat-icon">{x.i}</div><div className="stat-label">{x.l}</div><div className="stat-value">{x.v}</div></div>)}
     </div>
     <div style={{height:8,background:'var(--bg3)',borderRadius:6,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(rate,100)}%`,background:'var(--green)',transition:'width .3s'}}/></div>
-    <div style={{fontSize:10,color:'var(--text3)',marginTop:8,lineHeight:1.7}}>نسبة التأكيد = (مؤكدة + خرجت للشحن) ÷ إجمالي أوردرات اليوم × 100. "خرجت للشحن" بتشمل اللي في الشحن والمسلّم ولم يتسلّم. الأرقام حسب الحالة الحالية للأوردرات اللي اتعملت في اليوم ده.</div>
+    {!one&&rows!==null&&<div style={{fontSize:11,color:'var(--text2)',marginTop:8}}>📊 متوسط الأوردرات في اليوم: <b>{(total/span).toFixed(1)}</b></div>}
+    {!one&&rows!==null&&<div style={{marginTop:10}}>
+      <button className="btn btn-ghost btn-sm" onClick={()=>setShowDays(x=>!x)}>{showDays?'▲ إخفاء':'▼ عرض'} تفصيل كل يوم ({span})</button>
+      {showDays&&<div className="box" style={{marginTop:8}}><div style={{overflowX:'auto'}}><table>
+        <thead><tr><th>اليوم</th><th>الأوردرات</th><th>مؤكدة</th><th>شحن</th><th>ملغية</th><th style={{minWidth:120}}>نسبة التأكيد</th></tr></thead>
+        <tbody>{perDay.map(d=>{const r=d.total?((d.confirmed+d.shipped)/d.total*100):0; return <tr key={d.day} style={{cursor:'default'}}>
+          <td className="bold" style={{fontSize:11,whiteSpace:'nowrap'}}>{fmtD(d.day,{weekday:'long',day:'numeric',month:'short'})}</td>
+          <td>{d.total}</td><td>{d.confirmed}</td><td>{d.shipped}</td><td>{d.cancelled}</td>
+          <td>{d.total?<div style={{display:'flex',alignItems:'center',gap:8}}><div style={{flex:1,height:6,background:'var(--bg3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(r,100)}%`,background:'var(--green)'}}/></div><b style={{fontSize:11,color:'var(--text)'}}>{r.toFixed(0)}%</b></div>:<span style={{color:'var(--text3)'}}>—</span>}</td>
+        </tr>;})}</tbody>
+      </table></div></div>}
+    </div>}
+    <div style={{fontSize:10,color:'var(--text3)',marginTop:8,lineHeight:1.7}}>نسبة التأكيد = (مؤكدة + خرجت للشحن) ÷ إجمالي الأوردرات × 100. "خرجت للشحن" بتشمل اللي في الشحن والمسلّم ولم يتسلّم. الأرقام حسب الحالة الحالية للأوردرات اللي اتعملت في {one?'اليوم ده':'الفترة دي'}.</div>
   </div>;
 };
 const existingRefs = async refs => {
@@ -1211,11 +1245,11 @@ const Dashboard = ({user}) => {
     <div className="page-header"><div><div className="page-title">لوحة التحكم 📊</div><div className="page-sub">مرحباً {user.name} — {new Date().toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div></div>
     <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
       <button className={`btn btn-sm ${tab==='overview'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('overview')}>📊 نظرة عامة</button>
+      <button className={`btn btn-sm ${tab==='team'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('team')}>🟢 حالة الفريق</button>
       <button className={`btn btn-sm ${tab==='agents'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('agents')}>👥 أداء الكول سنتر</button>
     </div>
-    {tab==='agents'?<AgentMonitor/>:<>
+    {tab==='agents'?<AgentMonitor/>:tab==='team'?<PresenceCard me={user}/>:<>
     <DayStats/>
-    <PresenceCard me={user}/>
     <div className="stats-grid">
       {cards.map((x,i)=><div key={i} className={`stat-card ${x.c}`}><div className="stat-icon">{x.i}</div><div className="stat-label">{x.l}</div><div className="stat-value" style={x.sm?{fontSize:16}:{}}>{x.v}</div></div>)}
     </div>
