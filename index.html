@@ -113,6 +113,8 @@ td.bold{color:var(--text);font-weight:600}
 .badge-no_answer_1{background:var(--yellow-bg);color:var(--yellow)}
 .badge-no_answer_2{background:var(--orange-bg);color:var(--orange)}
 .badge-postponed{background:var(--purple-bg);color:var(--purple)}
+@keyframes flashRow{0%,65%{outline:2px solid var(--accent);outline-offset:-2px;background:rgba(79,110,247,.14)}100%{outline:2px solid transparent;outline-offset:-2px}}
+.flash-row{animation:flashRow 2.2s ease}
 .box{min-width:0;max-width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
 .badge-paid{background:var(--green-bg);color:var(--green)}
 .badge-unpaid{background:var(--yellow-bg);color:var(--yellow)}
@@ -264,7 +266,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.10.25-range';
+const APP_VERSION = '2026.10.27-nav2';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = localStorage.getItem('crm_t')||'';
@@ -753,7 +755,7 @@ const fetchAllRows = async (build,opt={}) => {
 const FuCard = ({o,user,agentName,onDetail,doStatus,onPostpone,onCancel}) => {
   const late = o.follow_up_at && new Date(o.follow_up_at) < new Date();
   const raw=(o.customer_phone||'').replace(/\D/g,''); const intl=raw.startsWith('0')?'2'+raw:raw;
-  return <div style={{background:'var(--bg2)',border:`1px solid ${late?'var(--red)':'var(--border)'}`,borderRadius:12,padding:12,marginBottom:10}}>
+  return <div data-oid={o.id} style={{background:'var(--bg2)',border:`1px solid ${late?'var(--red)':'var(--border)'}`,borderRadius:12,padding:12,marginBottom:10}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
       <span style={{fontWeight:700,fontSize:12,color:late?'var(--red)':'var(--purple)'}}>{o.follow_up_at?`⏰ ${fmtTime(o.follow_up_at)}${late?' — فات ميعادها':''}`:'⏰ من غير ميعاد'}</span>
       <span style={{fontSize:11,color:'var(--text3)'}}>#{o.order_ref}{agentName?` · 👤 ${agentName}`:''}</span>
@@ -790,6 +792,7 @@ const FollowUpsPage = ({user}) => {
   },[]);
   useEffect(()=>{load();},[load]);
   const {doStatus,node,openPostpone,openCancel} = useStatusActions(user,id=>orders.find(x=>x.id===id),load,()=>setDetail(null));
+  useReturnToRow(detail&&detail.id);
 
   const list = orders.filter(o=>!fAgent||o.assigned_to===fAgent);
   const byDay = {}; list.forEach(o=>{const k=dayKeyOf(o.follow_up_at);byDay[k]=(byDay[k]||0)+1;});
@@ -874,6 +877,7 @@ const CancellationsPage = ({user}) => {
   },[]);
   useEffect(()=>{load();},[load]);
   const {doStatus,node} = useStatusActions(user,id=>orders.find(x=>x.id===id),load,()=>setDetail(null));
+  useReturnToRow(detail&&detail.id);
   const cdate = o => o.status_updated_at||o.updated_at||o.created_at;
   const nameOf = id => (users.find(u=>u.id===id)||{}).name||'—';
   const affName = id => (affs.find(a=>a.id===id)||{}).name||'';
@@ -943,7 +947,7 @@ const CancellationsPage = ({user}) => {
       </div>
       <table>
         <thead><tr><th>الأوردر</th><th>العميل</th><th>المحافظة</th><th>المنتج</th><th>الموظف</th><th>سبب الإلغاء</th><th>تاريخ الإلغاء</th><th>تاريخ الأوردر</th></tr></thead>
-        <tbody>{paged.map(o=><tr key={o.id} onClick={()=>setDetail(o)}>
+        <tbody>{paged.map(o=><tr key={o.id} data-oid={o.id} onClick={()=>setDetail(o)}>
           <td className="bold" style={{fontSize:11}}>{o.order_ref}</td>
           <td><div style={{fontWeight:600,color:'var(--text)'}}>{o.customer_name}</div><div style={{fontSize:10,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div></td>
           <td>{o.city||'-'}</td><td>{o.product_name||'-'}</td><td>{nameOf(o.assigned_to)}</td>
@@ -952,7 +956,7 @@ const CancellationsPage = ({user}) => {
         </tr>)}</tbody>
       </table>
       <div className="order-card" style={{padding:'8px 10px'}}>
-        {paged.map(o=><div key={o.id} onClick={()=>setDetail(o)} style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:12,padding:12,marginBottom:10}}>
+        {paged.map(o=><div key={o.id} data-oid={o.id} onClick={()=>setDetail(o)} style={{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:12,padding:12,marginBottom:10}}>
           <div style={{display:'flex',justifyContent:'space-between',gap:8,fontSize:12}}><b style={{color:'var(--text)'}}>#{o.order_ref}</b><span style={{color:rColor[o.cancel_reason||'none'],fontWeight:700,textAlign:'left'}}>🚫 {cancelLabel(o)}</span></div>
           <div style={{marginTop:6,fontWeight:600,color:'var(--text)'}}>{o.customer_name}</div>
           <div style={{fontSize:11,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div>
@@ -1056,6 +1060,21 @@ const AgentMonitor = () => {
     </div>
   </div>;
 };
+// بعد قفل تفاصيل أوردر: يرجّعك لنفس الصف (من غير ما يسيبك فوق) ويعمله إضاءة خفيفة
+const useReturnToRow = openId => {
+  const last = useRef(null);
+  useEffect(()=>{
+    if(openId){last.current=openId;return;}
+    if(!last.current) return;
+    const id=last.current;
+    const t=setTimeout(()=>{
+      const el=[...document.querySelectorAll(`[data-oid="${id}"]`)].find(e=>e.offsetParent!==null);
+      if(el){el.scrollIntoView({block:'nearest'});el.classList.add('flash-row');setTimeout(()=>el.classList.remove('flash-row'),2300);}
+    },150);
+    return()=>clearTimeout(t);
+  },[openId]);
+};
+const CC_STATUSES = ['confirmed','cancelled','follow_up','postponed','no_answer_1','no_answer_2'];
 const statusTime = o => o.status_updated_at||o.updated_at||o.created_at;
 const StatusTime = ({o}) => <>
   <div style={{fontSize:9,color:'var(--text3)',marginTop:3,whiteSpace:'nowrap'}} title="وقت آخر تغيير للحالة">🕒 {fmtDate(statusTime(o))}</div>
@@ -1064,7 +1083,33 @@ const StatusTime = ({o}) => <>
 </>;
 const SBadge = ({status}) => <span className={`badge ${SC[status]||'badge-new'}`}><span className="badge-dot" style={{background:'currentColor'}}/>{SL[status]||status}</span>;
 
+// زرار الرجوع (Back) بيقفل أعلى نافذة بدل ما يطلّعك من التطبيق.
+// سجل المتصفح بيتظبط مرة واحدة بعد كل تغيير (عدد المداخل = عدد النوافذ المفتوحة)، فتبديل نافذة بنافذة مبيلمسش السجل.
+const MODAL_STACK = []; let IGNORE_POPS = 0, MODAL_DEPTH = 0, HIST_DEPTH = 0, HIST_TIMER = null;
+const reconcileHistory = () => {
+  HIST_TIMER=null;
+  while(HIST_DEPTH<MODAL_DEPTH){ history.pushState({modal:1},''); HIST_DEPTH++; }
+  if(HIST_DEPTH>MODAL_DEPTH){ const k=HIST_DEPTH-MODAL_DEPTH; HIST_DEPTH=MODAL_DEPTH; IGNORE_POPS++; history.go(-k); }
+};
+const scheduleHistory = () => { if(HIST_TIMER===null) HIST_TIMER=setTimeout(reconcileHistory,0); };
+window.addEventListener('popstate',()=>{
+  if(IGNORE_POPS>0){IGNORE_POPS--;return;}                       // رجعة إحنا اللي عملناها
+  const top=MODAL_STACK[MODAL_STACK.length-1];
+  if(top){ HIST_DEPTH=Math.max(0,HIST_DEPTH-1); top.popClose(); }
+});
 const Modal = ({show,onClose,title,children,size='md',footer}) => {
+  const closeRef = useRef(onClose); closeRef.current = onClose;
+  useEffect(()=>{
+    if(!show) return;
+    let popped=false;
+    const entry={popClose:()=>{popped=true;MODAL_DEPTH=Math.max(0,MODAL_DEPTH-1);closeRef.current&&closeRef.current();}};
+    MODAL_STACK.push(entry); MODAL_DEPTH++; scheduleHistory();
+    return()=>{
+      const k=MODAL_STACK.indexOf(entry); if(k>=0) MODAL_STACK.splice(k,1);
+      if(!popped) MODAL_DEPTH=Math.max(0,MODAL_DEPTH-1);
+      scheduleHistory();
+    };
+  },[show]);
   if(!show) return null;
   return <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
     <div className={`modal modal-${size}`}>
@@ -1294,7 +1339,6 @@ const OrdersPage = ({user}) => {
   const setM = (k,v) => setModals(m=>({...m,[k]:v}));
 
   const load = useCallback(async()=>{
-    setLoading(true);
     const [a,u,o] = await Promise.all([
       sb.from('affiliates').select('*').order('name'),
       sb.from('users').select(USER_COLS).order('name'),
@@ -1351,6 +1395,7 @@ const OrdersPage = ({user}) => {
   const SortIcon = ({col}) => sortBy===col ? (sortDir==='asc'?'↑':'↓') : '⇅';
 
   const {doStatus,node:statusNode} = useStatusActions(user,id=>orders.find(x=>x.id===id),load,()=>setM('detail',null));
+  useReturnToRow((modals.detail&&modals.detail.id)||(modals.edit&&modals.edit.id));
 
   const ccAllow=['confirmed','cancelled','follow_up','postponed','no_answer_1','no_answer_2'];
   const shipAllow=['shipped','delivered','not_delivered'];
@@ -1482,7 +1527,7 @@ const OrdersPage = ({user}) => {
                 const isSel=sel.includes(o.id);
                 const fp=(o.total_cost||0)-(o.discount||0);
                 const acts=getActs(o);
-                return <tr key={o.id} className={isSel?'selected':''} onClick={()=>setM('detail',o)}>
+                return <tr key={o.id} data-oid={o.id} className={isSel?'selected':''} onClick={()=>setM('detail',o)}>
                   <td className="td-check" onClick={e=>{e.stopPropagation();setSel(s=>s.includes(o.id)?s.filter(x=>x!==o.id):[...s,o.id])}}><input type="checkbox" checked={isSel} onChange={()=>{}}/></td>
                   <td className="bold" style={{fontSize:11}}>{o.order_ref}<DupBadge d={dupMap[o.id]}/>{waMap&&waMap[o.id]&&<div title="اتضغط على زرار الواتساب" style={{marginTop:3,fontSize:9,fontWeight:700,color:'var(--green)'}}>💬 واتساب ×{waMap[o.id].n}</div>}</td>
                   <td><div style={{fontWeight:600,color:'var(--text)',fontSize:12}}>{o.customer_name}</div><div style={{fontSize:10,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div></td>
@@ -1516,7 +1561,7 @@ const OrdersPage = ({user}) => {
             const acts=getActs(o);
             const rawPhone=(o.customer_phone||'').replace(/\D/g,'');
             const intlPhone=rawPhone.startsWith('0')?'2'+rawPhone:rawPhone;
-            return <div key={o.id} style={{background:isSel?'var(--accent-glow)':'var(--bg3)',border:`1px solid ${isSel?'var(--accent)':'var(--border)'}`,borderRadius:12,padding:14,marginBottom:10,transition:'all .15s'}}>
+            return <div key={o.id} data-oid={o.id} style={{background:isSel?'var(--accent-glow)':'var(--bg3)',border:`1px solid ${isSel?'var(--accent)':'var(--border)'}`,borderRadius:12,padding:14,marginBottom:10,transition:'all .15s'}}>
               {/* Card header */}
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
                 <input type="checkbox" checked={isSel} onChange={()=>setSel(s=>s.includes(o.id)?s.filter(x=>x!==o.id):[...s,o.id])} onClick={e=>e.stopPropagation()}/>
@@ -1738,6 +1783,14 @@ const EditModal = ({order,user,affs,onClose}) => {
   return <Modal show={true} onClose={onClose} title={`✏️ تعديل — ${order.order_ref}`} size="lg"
     footer={<><button className="btn btn-ghost" onClick={onClose}>إلغاء</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving?'⏳...':'💾 حفظ'}</button></>}>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+      <div className="form-group" style={{gridColumn:'1/-1'}}>
+        <label className="form-label">الحالة {f.status!==order.status&&<span style={{color:'var(--accent)',fontWeight:400}}>— هتتغير من "{SL[order.status]}" إلى "{SL[f.status]}" عند الحفظ</span>}</label>
+        <select className="input select" value={f.status} onChange={e=>sf('status',e.target.value)}>
+          {(user.role==='admin'?Object.keys(SL):[...new Set([order.status,...CC_STATUSES])]).map(k=><option key={k} value={k}>{SL[k]}</option>)}
+        </select>
+      </div>
+      {f.status==='postponed'&&<div style={{gridColumn:'1/-1',marginBottom:12}}><PostponeFields value={fu} onChange={setFu}/></div>}
+      {f.status==='cancelled'&&<div style={{gridColumn:'1/-1',marginBottom:12}}><CancelFields reason={f.cancel_reason||''} note={f.cancel_note||''} setReason={v=>sf('cancel_reason',v)} setNote={v=>sf('cancel_note',v)}/></div>}
       {inp('اسم العميل','customer_name')}
       {inp('التليفون','customer_phone')}
       {inp('تليفون بديل','customer_alt_phone')}
@@ -1768,13 +1821,6 @@ const EditModal = ({order,user,affs,onClose}) => {
             {affs.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
-        <div className="form-group"><label className="form-label">الحالة</label>
-          <select className="input select" value={f.status} onChange={e=>sf('status',e.target.value)}>
-            {Object.entries(SL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-          </select>
-        </div>
-        {f.status==='postponed'&&<div style={{gridColumn:'1/-1',marginBottom:12}}><PostponeFields value={fu} onChange={setFu}/></div>}
-        {f.status==='cancelled'&&<div style={{gridColumn:'1/-1',marginBottom:12}}><CancelFields reason={f.cancel_reason||''} note={f.cancel_note||''} setReason={v=>sf('cancel_reason',v)} setNote={v=>sf('cancel_note',v)}/></div>}
       </>}
       {inp('ملاحظات','note','textarea',true)}
     </div>
@@ -2175,7 +2221,6 @@ const ShippingPage = ({user}) => {
   const [printList,setPrint] = useState(null);
 
   const load = useCallback(async()=>{
-    setLoading(true);
     const [o,{data:a}]=await Promise.all([
       fetchAllRows(()=>sb.from('orders').select('*').in('status',['confirmed','shipped','delivered','not_delivered']).order('created_at',{ascending:false}).order('id')),
       sb.from('affiliates').select('*'),
@@ -2310,7 +2355,6 @@ const AffsPage = ({user}) => {
   const [detail,setDetail] = useState(null);
 
   const load = useCallback(async()=>{
-    setLoading(true);
     const [{data:af},or,co]=await Promise.all([
       sb.from('affiliates').select('*').order('name'),
       fetchAllRows(()=>sb.from('orders').select('affiliate_id,status,total_cost,discount').order('id')),
@@ -2466,7 +2510,6 @@ const CommsPage = ({user}) => {
   const [showPay,setShowPay] = useState(false);
 
   const load=useCallback(async()=>{
-    setLoading(true);
     const [c,o,{data:a}]=await Promise.all([
       fetchAllRows(()=>sb.from('commissions').select('*').order('created_at',{ascending:false}).order('id')),
       fetchAllRows(()=>sb.from('orders').select('id,order_ref').order('id')),
