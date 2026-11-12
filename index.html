@@ -266,7 +266,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.10.27-nav2';
+const APP_VERSION = '2026.11.11-returns';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = localStorage.getItem('crm_t')||'';
@@ -1081,6 +1081,135 @@ const StatusTime = ({o}) => <>
   {o.status==='postponed'&&<div style={{fontSize:9,fontWeight:700,color:'var(--purple)',marginTop:2,whiteSpace:'nowrap'}}>⏰ متابعة: {fmtFollow(o.follow_up_at)}</div>}
   {o.status==='cancelled'&&o.cancel_reason&&<div style={{fontSize:9,fontWeight:700,color:'var(--red)',marginTop:2}}>🚫 {cancelLabel(o)}</div>}
 </>;
+const RET_AR = {return:'↩️ استرجاع',exchange:'🔁 استبدال'};
+const RetBadge = ({o}) => o&&o.return_type?<span className="chip" style={{fontSize:9,marginRight:4,color:'var(--accent)',borderColor:'var(--accent)'}} title="طلب استرجاع/استبدال">{RET_AR[o.return_type]}</span>:null;
+// تصغير صورة الفاتورة قبل الرفع (أقصى ضلع 1400px، JPEG)
+const compressImage = (file,max=1400,q=0.75) => new Promise((res,rej)=>{
+  const r=new FileReader(); r.onerror=()=>rej(new Error('read'));
+  r.onload=()=>{const img=new Image(); img.onerror=()=>rej(new Error('decode'));
+    img.onload=()=>{const k=Math.min(1,max/Math.max(img.width,img.height));const w=Math.round(img.width*k),h=Math.round(img.height*k);
+      const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(img,0,0,w,h);res(c.toDataURL('image/jpeg',q));};
+    img.src=r.result;};
+  r.readAsDataURL(file);
+});
+const RET_ERR = {not_allowed:'مش مسموحلك تعمل الطلب ده',bad_type:'اختار استرجاع أو استبدال',product_required:'اكتب المنتج المطلوب',bad_shipping:'سعر الشحن غلط',invoice_required:'صورة الفاتورة مطلوبة',invoice_too_big:'صورة الفاتورة كبيرة، جرّب صورة أصغر',order_not_found:'الأوردر الأصلي مش موجود',not_shipped:'الأوردر الأصلي لازم يكون حالته "خرج للشحن"',already_exists:'الأوردر ده متعمله طلب استرجاع/استبدال قبل كده'};
+const retErr = e => {const m=(e&&e.message)||''; const k=Object.keys(RET_ERR).find(k=>m.includes(k)); if(k) return RET_ERR[k]; if(m.includes('app_create_return')||m.includes('app_return_candidates')) return 'لازم تشغّل ملف returns-migration.sql في Supabase الأول'; return 'حدث خطأ: '+m;};
+
+/* ═══════════════════════════════════
+   طلب استرجاع / استبدال
+═══════════════════════════════════ */
+const ReturnModal = ({onClose}) => {
+  const [phone,setPhone] = useState('');
+  const [list,setList] = useState(null);          // null = لسه مدورتش
+  const [searching,setSearching] = useState(false);
+  const [pick,setPick] = useState(null);
+  const [type,setType] = useState('exchange');
+  const [product,setProduct] = useState('');
+  const [ship,setShip] = useState('');
+  const [note,setNote] = useState('');
+  const [img,setImg] = useState('');
+  const [imgBusy,setImgBusy] = useState(false);
+  const [saving,setSaving] = useState(false);
+
+  const search = async () => {
+    const d=phone.replace(/[٠-٩]/g,c=>'٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/\D/g,'');
+    if(d.length<8){toast('اكتب رقم موبايل صحيح','error');return;}
+    setSearching(true); setPick(null);
+    const {data,error} = await sb.rpc('app_return_candidates',{p_phone:phone});
+    setSearching(false);
+    if(error){toast(retErr(error),'error');return;}
+    setList(data||[]);
+    const ok=(data||[]).filter(o=>!o.existing_ref); if(ok.length===1) setPick(ok[0]);
+  };
+  const onFile = async e => {
+    const file=e.target.files&&e.target.files[0]; e.target.value='';
+    if(!file) return;
+    if(!/^image\//.test(file.type)){toast('ارفع صورة بس','error');return;}
+    setImgBusy(true);
+    try{ setImg(await compressImage(file)); }catch(_){ toast('مش قادر أفتح الصورة دي، جرّب صورة JPG أو PNG','error'); }
+    setImgBusy(false);
+  };
+  const save = async () => {
+    if(!pick){toast('اختار الأوردر الأصلي','error');return;}
+    if(!product.trim()){toast('اكتب المنتج المطلوب','error');return;}
+    const sh=ship===''?NaN:parseFloat(ship);
+    if(isNaN(sh)||sh<0){toast('اكتب سعر الشحن (ممكن 0)','error');return;}
+    if(!img){toast('صورة الفاتورة مطلوبة','error');return;}
+    setSaving(true);
+    const {data,error} = await sb.rpc('app_create_return',{p_parent:pick.id,p_type:type,p_product:product.trim(),p_shipping:sh,p_invoice:img,p_note:note.trim()||null});
+    if(error){toast(retErr(error),'error');setSaving(false);return;}
+    toast(`تم إنشاء ${type==='exchange'?'الاستبدال':'الاسترجاع'} ✅ رقم ${data&&data.order_ref} (مؤكد)`,'success');
+    onClose(true);
+  };
+
+  return <Modal show={true} onClose={()=>onClose(false)} title="🔁 طلب استرجاع / استبدال" size="lg"
+    footer={<><button className="btn btn-ghost" onClick={()=>onClose(false)}>إلغاء</button><button className="btn btn-primary" onClick={save} disabled={saving||!pick||imgBusy}>{saving?'⏳...':'💾 حفظ كأوردر مؤكد'}</button></>}>
+    <div className="form-group">
+      <label className="form-label">رقم موبايل العميل</label>
+      <div style={{display:'flex',gap:8}}>
+        <input className="input" inputMode="tel" placeholder="01xxxxxxxxx" value={phone} onChange={e=>setPhone(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()} style={{direction:'ltr',textAlign:'right'}}/>
+        <button className="btn btn-primary" onClick={search} disabled={searching}>{searching?'⏳':'🔍 بحث'}</button>
+      </div>
+      <div style={{fontSize:10,color:'var(--text3)',marginTop:4}}>بيظهر بس الأوردرات اللي حالتها "خرج للشحن"</div>
+    </div>
+    {list&&list.length===0&&<div style={{background:'var(--bg3)',borderRadius:8,padding:12,fontSize:12,color:'var(--text3)',textAlign:'center',marginBottom:12}}>مفيش أوردرات "خرج للشحن" على الرقم ده</div>}
+    {list&&list.length>0&&<div style={{marginBottom:14}}>
+      <div className="form-label">اختار الأوردر الأصلي</div>
+      {list.map(o=>{const dis=!!o.existing_ref, on=pick&&pick.id===o.id;
+        return <div key={o.id} onClick={()=>!dis&&setPick(o)} style={{cursor:dis?'not-allowed':'pointer',opacity:dis?.55:1,background:on?'var(--accent-bg, var(--bg3))':'var(--bg3)',border:`1.5px solid ${on?'var(--accent)':'var(--border)'}`,borderRadius:10,padding:'9px 12px',marginBottom:7}}>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <span style={{fontSize:14}}>{on?'🔘':'⚪'}</span>
+            <b style={{color:'var(--text)'}}>#{o.order_ref}</b><SBadge status="shipped"/>
+            <span style={{fontSize:11,color:'var(--text3)'}}>🕒 {fmtDate(o.status_updated_at||o.created_at)}</span>
+            {dis&&<span className="chip" style={{fontSize:9,color:'var(--red)',borderColor:'var(--red)'}}>متعمله طلب قبل كده #{o.existing_ref}</span>}
+          </div>
+          <div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>{o.customer_name} · {o.customer_phone}{o.customer_alt_phone?' / '+o.customer_alt_phone:''}</div>
+          <div style={{fontSize:11,color:'var(--text3)'}}>{[o.city,o.area,o.customer_address].filter(Boolean).join(' — ')}</div>
+          <div style={{fontSize:11,color:'var(--text3)'}}>📦 {o.product_name||'-'} {o.quantity>1?`× ${o.quantity}`:''} · {fmtMoney(o.total_cost)}</div>
+        </div>;})}
+    </div>}
+    {pick&&<>
+      <div className="divider"/>
+      <div style={{fontSize:11,color:'var(--text3)',marginBottom:10}}>الأوردر الجديد هيتعمل بنفس بيانات العميل (الاسم، العنوان، الموبايلات) ويتحفظ <b style={{color:'var(--green)'}}>مؤكد</b> ويطلع مع تصدير المؤكد.</div>
+      <div style={{display:'flex',gap:8,marginBottom:12}}>
+        {['exchange','return'].map(t=><button key={t} className={`btn ${type===t?'btn-primary':'btn-ghost'}`} style={{flex:1,justifyContent:'center'}} onClick={()=>setType(t)}>{RET_AR[t]}</button>)}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:12}}>
+        <div className="form-group"><label className="form-label">المنتج المطلوب *</label><input className="input" value={product} onChange={e=>setProduct(e.target.value)} placeholder={type==='exchange'?'مثلاً: كورسيه أسود مقاس L':'المنتج اللي هيرجع'}/></div>
+        <div className="form-group"><label className="form-label">سعر الشحن *</label><input className="input" type="number" min="0" value={ship} onChange={e=>setShip(e.target.value)} placeholder="0"/></div>
+        <div className="form-group" style={{gridColumn:'1/-1'}}><label className="form-label">ملاحظة (اختياري)</label><input className="input" value={note} onChange={e=>setNote(e.target.value)} placeholder="مثلاً: المقاس صغير"/></div>
+      </div>
+      <div className="form-group">
+        <label className="form-label">صورة الفاتورة * <span style={{fontWeight:400,color:'var(--text3)'}}>(شرط عشان الأوردر يتعمل)</span></label>
+        <label className="btn btn-ghost" style={{cursor:'pointer',display:'inline-flex'}}>
+          {imgBusy?'⏳ بيجهّز الصورة...':img?'🔄 تغيير الصورة':'📷 رفع صورة الفاتورة'}
+          <input type="file" accept="image/*" onChange={onFile} style={{display:'none'}}/>
+        </label>
+        {img&&<div style={{marginTop:8,display:'flex',gap:8,alignItems:'flex-start'}}>
+          <img src={img} alt="الفاتورة" style={{maxWidth:180,maxHeight:180,borderRadius:8,border:'1px solid var(--border)',objectFit:'contain',background:'#fff'}}/>
+          <button className="btn btn-ghost btn-xs" onClick={()=>setImg('')}>✕ شيل</button>
+        </div>}
+      </div>
+    </>}
+  </Modal>;
+};
+
+// عرض فاتورة أوردر الاسترجاع/الاستبدال
+const InvoiceView = ({orderId}) => {
+  const [src,setSrc] = useState(null);   // null تحميل | false مفيش
+  const [open,setOpen] = useState(false);
+  useEffect(()=>{let alive=true;setSrc(null);
+    sb.from('order_invoices').select('image').eq('order_id',orderId).maybeSingle().then(({data,error})=>{if(alive) setSrc(!error&&data?data.image:false);});
+    return()=>{alive=false;};},[orderId]);
+  if(src===null) return <span style={{fontSize:11,color:'var(--text3)'}}>⏳ الفاتورة...</span>;
+  if(src===false) return <span style={{fontSize:11,color:'var(--text3)'}}>مفيش صورة فاتورة</span>;
+  return <>
+    <img src={src} alt="الفاتورة" onClick={()=>setOpen(true)} style={{width:64,height:64,objectFit:'cover',borderRadius:6,border:'1px solid var(--border)',cursor:'zoom-in',background:'#fff'}}/>
+    {open&&<div onClick={()=>setOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.85)',zIndex:3000,display:'flex',alignItems:'center',justifyContent:'center',padding:16,cursor:'zoom-out'}}>
+      <img src={src} alt="الفاتورة" style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',background:'#fff',borderRadius:6}}/>
+    </div>}
+  </>;
+};
 const SBadge = ({status}) => <span className={`badge ${SC[status]||'badge-new'}`}><span className="badge-dot" style={{background:'currentColor'}}/>{SL[status]||status}</span>;
 
 // زرار الرجوع (Back) بيقفل أعلى نافذة بدل ما يطلّعك من التطبيق.
@@ -1413,6 +1542,7 @@ const OrdersPage = ({user}) => {
       <div><div className="page-title">{user.role==='call_center'?'أوردراتي':'إدارة الأوردرات'} 📋</div><div className="page-sub">{filtered.length} أوردر</div></div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
         {sel.length>0&&<button className="btn btn-ghost" onClick={()=>setPrint(orders.filter(o=>sel.includes(o.id)))}>🖨️ طباعة ({sel.length})</button>}
+        {(user.role==='admin'||user.role==='call_center')&&<button className="btn btn-warning" onClick={()=>setM('ret',true)}>🔁 استرجاع / استبدال</button>}
         {user.role==='admin'&&<>
           <button className="btn btn-ghost" onClick={()=>exportConfirmedOrders(orders.filter(o=>o.status==='confirmed'),affs,dupMap)}>📥 تصدير مؤكدة</button>
           <button className="btn btn-ghost" disabled={sel.length===0} title={sel.length===0?'حدد أوردرات الأول':''} onClick={()=>exportConfirmedOrders(orders.filter(o=>sel.includes(o.id)),affs,dupMap,'selected_orders')}>📤 تصدير المحدد ({sel.length})</button>
@@ -1529,7 +1659,7 @@ const OrdersPage = ({user}) => {
                 const acts=getActs(o);
                 return <tr key={o.id} data-oid={o.id} className={isSel?'selected':''} onClick={()=>setM('detail',o)}>
                   <td className="td-check" onClick={e=>{e.stopPropagation();setSel(s=>s.includes(o.id)?s.filter(x=>x!==o.id):[...s,o.id])}}><input type="checkbox" checked={isSel} onChange={()=>{}}/></td>
-                  <td className="bold" style={{fontSize:11}}>{o.order_ref}<DupBadge d={dupMap[o.id]}/>{waMap&&waMap[o.id]&&<div title="اتضغط على زرار الواتساب" style={{marginTop:3,fontSize:9,fontWeight:700,color:'var(--green)'}}>💬 واتساب ×{waMap[o.id].n}</div>}</td>
+                  <td className="bold" style={{fontSize:11}}>{o.order_ref}<RetBadge o={o}/><DupBadge d={dupMap[o.id]}/>{waMap&&waMap[o.id]&&<div title="اتضغط على زرار الواتساب" style={{marginTop:3,fontSize:9,fontWeight:700,color:'var(--green)'}}>💬 واتساب ×{waMap[o.id].n}</div>}</td>
                   <td><div style={{fontWeight:600,color:'var(--text)',fontSize:12}}>{o.customer_name}</div><div style={{fontSize:10,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div></td>
                   <td style={{fontSize:11}}>{o.city||'-'}</td>
                   <td style={{maxWidth:130,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11}}>{o.product_name||'-'}</td>
@@ -1568,7 +1698,7 @@ const OrdersPage = ({user}) => {
                 <div style={{flex:1}}>
                   <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <span style={{fontWeight:800,color:'var(--text)',fontSize:13}}>#{o.order_ref}</span>
-                    <SBadge status={o.status}/>
+                    <SBadge status={o.status}/><RetBadge o={o}/>
                     {aff&&<span className="chip" style={{fontSize:9}}>🎯 {aff.name}</span>}
                   </div>
                   <StatusTime o={o}/>
@@ -1626,6 +1756,7 @@ const OrdersPage = ({user}) => {
 
     {modals.detail&&<DetailModal order={modals.detail} user={user} affs={affs} users={users} doStatus={doStatus} onEdit={()=>{setM('edit',modals.detail);setM('detail',null);}} onPrint={()=>{setPrint([modals.detail]);setM('detail',null);}} dups={dupMap[modals.detail.id]} onClose={()=>{setM('detail',null);load();}}/>}
     {modals.edit&&<EditModal order={modals.edit} user={user} affs={affs} onClose={()=>{setM('edit',null);load();}}/>}
+    {modals.ret&&<ReturnModal onClose={done=>{setM('ret',false);if(done)load();}}/>}
     {modals.import&&<ImportModal user={user} affs={affs} onClose={()=>{setM('import',false);load();}}/>}
     {modals.add&&<AddModal user={user} affs={affs} onClose={()=>{setM('add',false);load();}}/>}
     {modals.assign&&<AssignModal order={modals.assign} ccUsers={ccUsers} user={user} onClose={()=>{setM('assign',null);load();}}/>}
@@ -1691,6 +1822,13 @@ const DetailModal = ({order,user,affs,users,doStatus,onEdit,onPrint,onClose,dups
         {onPrint&&<button className="btn btn-ghost btn-sm" onClick={onPrint}>🖨️ طباعة</button>}
       </div>
     </div>
+    {order.return_type&&<div style={{background:'var(--bg3)',border:'1px solid var(--accent)',borderRadius:10,padding:'10px 12px',marginBottom:12,display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+      <div style={{flex:1,minWidth:160}}>
+        <div style={{fontWeight:700,fontSize:13,color:'var(--accent)'}}>{RET_AR[order.return_type]}</div>
+        <div style={{fontSize:11,color:'var(--text2)',marginTop:3}}>{(order.note||'').split(' — ').slice(1).join(' — ')||'أوردر استرجاع/استبدال'}</div>
+      </div>
+      <div style={{textAlign:'center'}}><div style={{fontSize:10,color:'var(--text3)',marginBottom:3}}>🧾 الفاتورة</div><InvoiceView orderId={order.id}/></div>
+    </div>}
     {dups&&dups.matches.length>0&&<div style={{background:dups.isDup?'var(--orange-bg)':'var(--bg3)',border:`1px solid ${dups.isDup?'var(--orange)':'var(--border)'}`,borderRadius:10,padding:'10px 12px',marginBottom:12}}>
       <div style={{fontWeight:700,fontSize:12,color:dups.isDup?'var(--orange)':'var(--text2)',marginBottom:6}}>{dups.isDup?'🔁 أوردر مكرر':'ℹ️ أوردرات مطابقة'} — تطابق تام في الاسم / الموبايل / العنوان</div>
       {dups.matches.map(m=><div key={m.id} style={{fontSize:11,color:'var(--text2)',padding:'4px 0',display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
@@ -2276,7 +2414,7 @@ const ShippingPage = ({user}) => {
             const a2=acts[o.status]||[];
             return <tr key={o.id} className={sel.includes(o.id)?'selected':''}>
               <td className="td-check" onClick={e=>e.stopPropagation()}><input type="checkbox" checked={sel.includes(o.id)} onChange={()=>setSel(s=>s.includes(o.id)?s.filter(x=>x!==o.id):[...s,o.id])}/></td>
-              <td className="bold" style={{fontSize:11}}>{o.order_ref}<DupBadge d={dupMap[o.id]}/></td>
+              <td className="bold" style={{fontSize:11}}>{o.order_ref}<RetBadge o={o}/><DupBadge d={dupMap[o.id]}/></td>
               <td><div style={{fontWeight:600,color:'var(--text)'}}>{o.customer_name}</div><div style={{fontSize:10,color:'var(--text3)',direction:'ltr',textAlign:'right'}}>{o.customer_phone}</div><StatusTime o={o}/></td>
               <td style={{fontSize:11}}>{o.city||'-'}</td>
               <td style={{fontSize:11,color:'var(--text2)',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.customer_address||'-'}</td>
@@ -2304,7 +2442,7 @@ const ShippingPage = ({user}) => {
                 <div style={{flex:1}}>
                   <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                     <span style={{fontWeight:800,color:'var(--text)',fontSize:13}}>#{o.order_ref}</span>
-                    <SBadge status={o.status}/>
+                    <SBadge status={o.status}/><RetBadge o={o}/>
                   </div>
                   <StatusTime o={o}/>
                   <DupBadge d={dupMap[o.id]} full/>
