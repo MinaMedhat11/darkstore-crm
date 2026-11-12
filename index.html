@@ -266,7 +266,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.11.11-returns';
+const APP_VERSION = '2026.11.12-backup';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = localStorage.getItem('crm_t')||'';
@@ -1386,6 +1386,55 @@ const Login = ({onLogin}) => {
 /* ═══════════════════════════════════
    DASHBOARD
 ═══════════════════════════════════ */
+/* ───────── نسخة احتياطية (Excel لكل الجداول) ───────── */
+const BACKUP_KEY='crm_last_backup';
+const BACKUP_TABLES=[
+  ['orders','الأوردرات','*'],['users','المستخدمين',null],['affiliates','الأفيليتس','*'],['commissions','العمولات','*'],
+  ['payment_batches','دفعات العمولات','*'],['order_notes','ملاحظات الأوردرات','*'],['order_events','تاريخ الأوردرات','*'],['audit_logs','سجل النشاطات','*'],
+];
+const lastBackup=()=>{try{const v=localStorage.getItem(BACKUP_KEY);return v?new Date(v):null;}catch(_){return null;}};
+const BackupButton = () => {
+  const [busy,setBusy]=useState('');
+  const [last,setLast]=useState(lastBackup());
+  const days=last?Math.floor((Date.now()-last.getTime())/86400000):null;
+  const due=days===null||days>=7;
+  const run=async()=>{
+    const wb=XLSX.utils.book_new(); const summary=[]; const skipped=[];
+    const cell=v=>{if(v===null||v===undefined) return ''; if(typeof v==='object') v=JSON.stringify(v); if(typeof v==='string'&&v.length>32000) v=v.slice(0,32000)+'…'; return v;};
+    for(const [t,label,cols] of BACKUP_TABLES){
+      setBusy(`⏳ ${label}...`);
+      const rows=await fetchAllRows(()=>sb.from(t).select(cols||USER_COLS).order('id'),{silent:true,nullOnError:true});
+      if(rows===null){skipped.push(label);continue;}
+      const data=rows.map(r=>{const o={};for(const k in r) o[k]=cell(r[k]);return o;});
+      const ws=data.length?XLSX.utils.json_to_sheet(data):XLSX.utils.aoa_to_sheet([['(فاضي)']]);
+      XLSX.utils.book_append_sheet(wb,ws,t.slice(0,31));
+      summary.push({الجدول:label,الاسم:t,عدد_الصفوف:rows.length});
+    }
+    if(!summary.length){setBusy('');toast('تعذر تحميل البيانات، جرّب تاني','error');return;}
+    const now=new Date();
+    const info=XLSX.utils.json_to_sheet([...summary,{},{الجدول:'وقت النسخة',الاسم:now.toLocaleString('ar-EG')},{الجدول:'ملاحظة',الاسم:'صور فواتير الاسترجاع وكلمات السر مش ضمن النسخة'}]);
+    XLSX.utils.book_append_sheet(wb,info,'ملخص');
+    wb.SheetNames.unshift(wb.SheetNames.pop());   // الملخص أول شيت
+    XLSX.writeFile(wb,`darkstore_backup_${localISODate(now)}.xlsx`);
+    try{localStorage.setItem(BACKUP_KEY,now.toISOString());}catch(_){}
+    setLast(now); setBusy(''); window.dispatchEvent(new Event('crm-backup'));
+    toast(skipped.length?`تم التحميل ✅ (اتخطّى: ${skipped.join('، ')})`:'تم تحميل النسخة الاحتياطية ✅',skipped.length?'info':'success');
+  };
+  return <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+    <span style={{fontSize:11,color:due?'var(--orange)':'var(--text3)'}}>{last?`آخر نسخة: ${days===0?'النهارده':`من ${days} يوم`}`:'مفيش نسخة احتياطية على الجهاز ده'}</span>
+    <button className={`btn ${due?'btn-warning':'btn-ghost'}`} onClick={run} disabled={!!busy}>{busy||'💾 نسخة احتياطية'}</button>
+  </div>;
+};
+const BackupReminder = () => {
+  const [,tick]=useState(0);
+  useEffect(()=>{const f=()=>tick(x=>x+1);window.addEventListener('crm-backup',f);return()=>window.removeEventListener('crm-backup',f);},[]);
+  const last=lastBackup(); const days=last?Math.floor((Date.now()-last.getTime())/86400000):null;
+  if(days!==null&&days<7) return null;
+  return <div style={{background:'var(--bg2)',border:'1px solid var(--orange)',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:12,color:'var(--text2)'}}>
+    ⚠️ {last?`آخر نسخة احتياطية كانت من ${days} يوم.`:'لسه ما اتعملتش نسخة احتياطية من الجهاز ده.'} دوس "💾 نسخة احتياطية" فوق واحفظ الملف في مكان آمن (Google Drive مثلاً).
+  </div>;
+};
+
 const Dashboard = ({user}) => {
   const [s,setS] = useState({total:0,new_p:0,confirmed:0,shipped:0,delivered:0,cancelled:0,revenue:0,pending_c:0});
   const [logs,setLogs] = useState([]);
@@ -1416,7 +1465,8 @@ const Dashboard = ({user}) => {
   const colors=['var(--accent)','var(--green)','var(--orange)','var(--purple)','var(--red)','var(--blue)'];
 
   return <div className="page">
-    <div className="page-header"><div><div className="page-title">لوحة التحكم 📊</div><div className="page-sub">مرحباً {user.name} — {new Date().toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div></div>
+    <div className="page-header"><div><div className="page-title">لوحة التحكم 📊</div><div className="page-sub">مرحباً {user.name} — {new Date().toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div>{user.role==='admin'&&<BackupButton/>}</div>
+    {user.role==='admin'&&<BackupReminder/>}
     <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
       <button className={`btn btn-sm ${tab==='overview'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('overview')}>📊 نظرة عامة</button>
       <button className={`btn btn-sm ${tab==='team'?'btn-primary':'btn-ghost'}`} onClick={()=>setTab('team')}>🟢 حالة الفريق</button>
