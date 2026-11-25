@@ -167,6 +167,12 @@ input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accent);cursor:
 .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 .spinner-sm{width:20px;height:20px;border-width:2px}
 @keyframes spin{to{transform:rotate(360deg)}}
+.refresh-btn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:9px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
+.refresh-btn:disabled{opacity:.7;cursor:default}
+.refresh-btn .ri{display:inline-block;font-size:14px;line-height:1}
+.refresh-btn.busy .ri{animation:spin .8s linear infinite}
+@media (max-width:768px){.refresh-btn .rt{display:none}.refresh-btn{padding:0 10px}}
 @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideInLeft{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
 .login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);background-image:radial-gradient(ellipse at 30% 50%,rgba(79,110,247,.08) 0%,transparent 60%)}
@@ -266,7 +272,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 /* ═══════════════════════════════════
    SUPABASE
 ═══════════════════════════════════ */
-const APP_VERSION = '2026.11.12-backup';
+const APP_VERSION = '2026.11.25-refresh';
 const SB_URL = 'https://iaazxlitrnvijamyvwvy.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYXp4bGl0cm52aWphbXl2d3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NDQwNDIsImV4cCI6MjA5NDAyMDA0Mn0.FY7NTmfPsMkBY2KXOV56eBq9HWpoOpIfXtw-YAPrxo4';
 let SESSION_TOKEN = localStorage.getItem('crm_t')||'';
@@ -354,6 +360,17 @@ const buildDupMap = rows => {
     e.isDup=prior.length>0; e.first=prior[0]||null; e.priorCount=prior.length;
   });
   return m;
+};
+// زرار "تحديث" اللي فوق: بيبعت حدث crm-refresh وكل صفحة بتعيد تحميل بياناتها من غير ريفريش للموقع
+const REFRESH_EVT='crm-refresh';
+const useAutoRefresh = fn => {
+  const ref=useRef(fn); ref.current=fn;
+  useEffect(()=>{const f=()=>{try{ref.current&&ref.current();}catch(_){}}; window.addEventListener(REFRESH_EVT,f); return()=>window.removeEventListener(REFRESH_EVT,f);},[]);
+};
+const useRefreshKey = () => {
+  const [k,setK]=useState(0);
+  useEffect(()=>{const f=()=>setK(x=>x+1); window.addEventListener(REFRESH_EVT,f); return()=>window.removeEventListener(REFRESH_EVT,f);},[]);
+  return k;
 };
 const useDuplicates = orders => {
   const [rows,setRows]=useState(null);
@@ -444,12 +461,13 @@ const DayStats = () => {
   const addDays = (iso,n) => { const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return localISODate(d); };
   const diffDays = (x,y) => Math.round((new Date(x+'T00:00:00')-new Date(y+'T00:00:00'))/86400000);
   const span = diffDays(to,from)+1;                                   // عدد أيام الفترة
+  const rk = useRefreshKey();
   useEffect(()=>{
     let alive=true; setRows(null);
     const a=new Date(from+'T00:00:00'), b=new Date(to+'T00:00:00'); b.setDate(b.getDate()+1);
     fetchAllRows(()=>sb.from('orders').select('status,created_at').gte('created_at',a.toISOString()).lt('created_at',b.toISOString()).order('created_at').order('id')).then(all=>{ if(alive) setRows(all); });
     return()=>{alive=false;};
-  },[from,to]);
+  },[from,to,rk]);
   const yest = addDays(today,-1);
   const wd = new Date(); wd.setDate(wd.getDate()-((wd.getDay()+1)%7));
   const presets = [
@@ -578,12 +596,13 @@ const usePresenceBeat = (pageRef,onExpired) => {
 };
 const usePresenceList = () => {
   const [list,setList] = useState(null);   // null = تحميل | false = مش مفعّل
+  const rk = useRefreshKey();
   useEffect(()=>{
     let alive=true;
     const load=async()=>{const {data,error}=await sb.rpc('app_presence'); if(alive) setList(error?false:(data||[]));};
     load(); const t=setInterval(load,30000);
     return()=>{alive=false;clearInterval(t);};
-  },[]);
+  },[rk]);
   return list;
 };
 const PresenceCard = ({me}) => {
@@ -791,6 +810,7 @@ const FollowUpsPage = ({user}) => {
     setOrders(rows); setAffs(a.data||[]); setUsers(u.data||[]); setLoading(false);
   },[]);
   useEffect(()=>{load();},[load]);
+  useAutoRefresh(load);
   const {doStatus,node,openPostpone,openCancel} = useStatusActions(user,id=>orders.find(x=>x.id===id),load,()=>setDetail(null));
   useReturnToRow(detail&&detail.id);
 
@@ -876,6 +896,7 @@ const CancellationsPage = ({user}) => {
     setOrders(rows); setAffs(a.data||[]); setUsers(u.data||[]); setLoading(false);
   },[]);
   useEffect(()=>{load();},[load]);
+  useAutoRefresh(load);
   const {doStatus,node} = useStatusActions(user,id=>orders.find(x=>x.id===id),load,()=>setDetail(null));
   useReturnToRow(detail&&detail.id);
   const cdate = o => o.status_updated_at||o.updated_at||o.created_at;
@@ -987,18 +1008,19 @@ const AgentMonitor = () => {
     else if(k==='week'){const s=new Date();s.setDate(s.getDate()-((s.getDay()+1)%7));setFrom(localISODate(s));setTo(t);}
     else if(k==='month'){setFrom(localISODate(new Date(d.getFullYear(),d.getMonth(),1)));setTo(t);}
   };
+  const rk = useRefreshKey();
   useEffect(()=>{
     let alive=true; setStats(null);
     const a=new Date(from+'T00:00:00'), b=new Date(to+'T00:00:00'); b.setDate(b.getDate()+1);
     sb.rpc('app_agent_stats',{p_from:a.toISOString(),p_to:b.toISOString()}).then(({data,error})=>{if(alive)setStats(error?false:(data||[]));});
     return()=>{alive=false;};
-  },[from,to]);
+  },[from,to,rk]);
   useEffect(()=>{
     let alive=true; setUnc(null);
     const load=()=>sb.rpc('app_uncontacted',{p_hours:hours}).then(({data,error})=>{if(alive)setUnc(error?false:(data||[]));});
     load(); const t=setInterval(load,60000);
     return()=>{alive=false;clearInterval(t);};
-  },[hours]);
+  },[hours,rk]);
   const rate = r => r.assigned?((r.confirmed+r.shipped_out)/r.assigned*100):0;
   const S = Array.isArray(stats)?stats:[];
   const tot = S.reduce((a,r)=>({assigned:a.assigned+r.assigned,confirmed:a.confirmed+r.confirmed,shipped_out:a.shipped_out+r.shipped_out,cancelled:a.cancelled+r.cancelled,contacted:a.contacted+r.contacted}),{assigned:0,confirmed:0,shipped_out:0,cancelled:0,contacted:0});
@@ -1441,6 +1463,7 @@ const Dashboard = ({user}) => {
   const [tab,setTab] = useState('overview');
   const [loading,setLoading] = useState(true);
 
+  const rk = useRefreshKey();
   useEffect(()=>{
     (async()=>{
       const [st,{data:a}] = await Promise.all([
@@ -1457,7 +1480,7 @@ const Dashboard = ({user}) => {
       }
       setLogs(a||[]); setLoading(false);
     })();
-  },[]);
+  },[rk]);
 
   if(loading) return <div className="page"><div className="loading-screen" style={{background:'transparent'}}><Spin/></div></div>;
 
@@ -1538,6 +1561,7 @@ const OrdersPage = ({user}) => {
   },[user]);
 
   useEffect(()=>{load();},[load]);
+  useAutoRefresh(load);
 
   const filtered = useMemo(()=>{
     let res = orders.filter(o=>{
@@ -2417,6 +2441,7 @@ const ShippingPage = ({user}) => {
   },[]);
 
   useEffect(()=>{load();},[load]);
+  useAutoRefresh(load);
 
   const filtered=orders.filter(o=>o.status===tab&&(!search||`${o.order_ref} ${o.customer_name} ${o.customer_phone} ${o.city}`.toLowerCase().includes(search.toLowerCase())));
   const paged=filtered.slice((page-1)*DEFAULT_PS,page*DEFAULT_PS);
@@ -2559,6 +2584,7 @@ const AffsPage = ({user}) => {
   },[]);
 
   useEffect(()=>{load();},[load]);
+  useAutoRefresh(load);
 
   const addAff = async f => {
     const {error}=await sb.from('affiliates').insert({id:uid(),...f});
@@ -2707,6 +2733,7 @@ const CommsPage = ({user}) => {
   },[]);
 
   useEffect(()=>{load();},[load]);
+  useAutoRefresh(load);
 
   const filtered=comms.filter(c=>{
     if(fp==='paid'&&!c.is_paid) return false;
@@ -2788,6 +2815,7 @@ const UsersPage = ({user}) => {
 
   const load=async()=>{setLoading(true);const{data}=await sb.from('users').select(USER_COLS).order('name');setUsers(data||[]);setLoading(false);};
   useEffect(()=>{load();},[]);
+  useAutoRefresh(load);
 
   const toggle=async id=>{
     if(id===user.id){toast('لا يمكن تعطيل حسابك','error');return;}
@@ -2857,7 +2885,8 @@ const AuditPage = () => {
   const [loading,setLoading]=useState(true);
   const [page,setPage]=useState(1);
   const [err,setErr]=useState('');
-  useEffect(()=>{sb.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(500).then(({data,error})=>{if(error)setErr(error.message);setLogs(data||[]);setLoading(false);});},[]);
+  const rk=useRefreshKey();
+  useEffect(()=>{sb.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(500).then(({data,error})=>{setErr(error?error.message:'');setLogs(data||[]);setLoading(false);});},[rk]);
   const paged=logs.slice((page-1)*DEFAULT_PS,page*DEFAULT_PS);
   const colors=['var(--accent)','var(--green)','var(--orange)','var(--purple)','var(--red)','var(--blue)'];
   return <div className="page">
@@ -2893,6 +2922,14 @@ const Shell = ({user,onLogout}) => {
   const [tick,setTick]=useState(0);
   useEffect(()=>{const t=setInterval(()=>setTick(x=>x+1),120000);return()=>clearInterval(t);},[]);
   const [sideOpen,setSideOpen]=useState(false);
+  const [refreshing,setRefreshing]=useState(false);
+  const doRefresh=()=>{
+    if(refreshing) return;
+    setRefreshing(true);
+    window.dispatchEvent(new Event(REFRESH_EVT));      // كل صفحة مفتوحة بتعيد تحميل بياناتها
+    setTick(x=>x+1);                                    // + أرقام القايمة الجانبية
+    setTimeout(()=>setRefreshing(false),900);
+  };
   const nav=NAV[user.role]||[];
   const closeSide=()=>setSideOpen(false);
   useEffect(()=>{
@@ -2946,6 +2983,7 @@ const Shell = ({user,onLogout}) => {
       <div className="topbar">
         <button className="menu-btn" onClick={()=>setSideOpen(s=>!s)}>☰</button>
         <div className="topbar-title">{titles[page]}</div>
+        <button className={`refresh-btn ${refreshing?'busy':''}`} onClick={doRefresh} disabled={refreshing} title="تحديث البيانات من غير ريفريش للصفحة"><span className="ri">🔄</span><span className="rt">{refreshing?'بيحدّث...':'تحديث'}</span></button>
         <span style={{fontSize:11,color:'var(--text3)'}}>مرحباً، <span style={{color:'var(--text2)',fontWeight:600}}>{user.name}</span></span>
         <span className="badge" style={{background:`${rc[user.role]}20`,color:rc[user.role]}}>{RL[user.role]}</span>
       </div>
